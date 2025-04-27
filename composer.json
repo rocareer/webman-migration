@@ -1,0 +1,22 @@
+{
+  "name": "rocareer/webman-migration",
+  "type": "library",
+  "license": "Apache-2.0",
+  "description": "Webman plugin rocareer/webman-migration",
+  "authors": [
+    {
+      "name": "albert",
+      "email": "albert@rocareer.com",
+      "homepage": "",
+      "role": "Developer"
+    }
+  ],
+  "require": {
+    "robmorgan/phinx": "^0.16.7"
+  },
+  "autoload": {
+    "psr-4": {
+      "Rocareer\\WebmanMigration\\": "src"
+    }
+  }
+}
