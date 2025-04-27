@@ -3,6 +3,7 @@
 namespace Rocareer\WebmanMigration\command;
 
 use Phinx\Console\PhinxApplication;
+use think\facade\Db;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputInterface;
@@ -33,6 +34,14 @@ class MigrateRun extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
+
+
+
+        // 设置数据库连接
+        Db::setConfig(config('think-orm'));
+        Db::connect('mysql'); // 连接数据库
+
+
         $phinx = new PhinxApplication();
         $phinx->setAutoExit(false);
 
@@ -60,10 +69,31 @@ class MigrateRun extends Command
         // 创建新的 ArrayInput 实例
         $phinxInput = new ArrayInput($phinxInput);
         $outputBuffer = new BufferedOutput();
+
+        // 在执行迁移之前，设置表前缀
+        $this->setTablePrefix();
+
         $phinx->run($phinxInput, $outputBuffer);
 
         $output->writeln($outputBuffer->fetch());
 
+
+
         return self::SUCCESS;
+    }
+
+    protected function setTablePrefix()
+    {
+        // 获取数据库配置
+        $config = config('think-orm.connections.mysql');
+
+        // 设置表前缀
+        if (isset($config['prefix'])) {
+            // 设置 Phinx 配置中的表前缀
+            $phinxConfig = base_path() . '/config/plugin/rocareer/webman-migration/migrate.php';
+            $phinxConfigContent = file_get_contents($phinxConfig);
+            $phinxConfigContent = str_replace('\'prefix\' => \'\',', '\'prefix\' => \'' . $config['prefix'] . '\',', $phinxConfigContent);
+            file_put_contents($phinxConfig, $phinxConfigContent);
+        }
     }
 }
