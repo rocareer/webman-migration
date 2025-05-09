@@ -11,6 +11,7 @@
       "role": "Developer"
     }
   ],
+
   "require": {
     "robmorgan/phinx": "^0.16.0"
   },
