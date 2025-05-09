@@ -6,15 +6,15 @@
  * Describe  phinx.php
  */
 return [
-    "paths" => [
-        "migrations" => "plugin/radmin/database/migrations",
-        "seeds"      => "plugin/radmin/database/seeds"
+    "paths"        => [
+        "migrations" => "database/migrations",
+        "seeds"      => "database/seeds"
     ],
     "table_prefix" => "ra_",
     "environments" => [
-        "default_migration_table" => getenv('THINKORM_DEFAULT_PREFIX')."migrations",
+        "default_migration_table" => getenv('THINKORM_DEFAULT_PREFIX') . "migrations",
         "default_environment"     => "dev",
-        "dev" => [
+        "dev"                     => [
             "adapter" => 'mysql',
             "host"    => getenv('THINKORM_DEFAULT_HOST', ''),
             "name"    => getenv('THINKORM_DEFAULT_DATABASE', ''),
@@ -22,19 +22,19 @@ return [
             "pass"    => getenv('THINKORM_DEFAULT_PASSWORD', ''),
             "port"    => getenv('THINKORM_DEFAULT_PORT', 3306),
             "charset" => getenv('THINKORM_DEFAULT_CHARSET', 'utf8'),
-            "prefix" => getenv('THINKORM_DEFAULT_PREFIX', 'ra_'), // 确保这里有前缀
+            "prefix"  => getenv('THINKORM_DEFAULT_PREFIX', 'ra_'), // 确保这里有前缀
 
 
         ],
-        'production' => [
+        'production'              => [
             'adapter' => 'mysql',
-            'host' => '127.0.0.1',
-            'name' => 'your_production_database_name',
-            'user' => 'root',
-            'pass' => 'your_password',
-            'port' => '3306',
+            'host'    => '127.0.0.1',
+            'name'    => 'your_production_database_name',
+            'user'    => 'root',
+            'pass'    => 'your_password',
+            'port'    => '3306',
             'charset' => 'utf8',
-            "prefix" => "rb_", // 确保这里有前缀
+            "prefix"  => "rb_", // 确保这里有前缀
         ],
     ]
 ];
