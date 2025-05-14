@@ -1,18 +1,21 @@
 <?php
 /**
- * File      phinx.php
- * Author    albert@rocareer.com
- * Time      2025-04-25 23:17:39
- * Describe  phinx.php
+ * File:        migrate.php
+ * Author:      albert <albert@rocareer.com>
+ * Created:     2025/5/14 10:49
+ * Description:
+ *
+ * Copyright [2014-2026] [https://rocareer.com]
+ * Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
  */
 return [
     "paths"        => [
         "migrations" => "database/migrations",
         "seeds"      => "database/seeds"
     ],
-    "table_prefix" => "ra_",
+    "table_prefix" => getenv('THINKORM_DEFAULT_PREFIX','ra_') ,
     "environments" => [
-        "default_migration_table" => getenv('THINKORM_DEFAULT_PREFIX') . "migrations",
+        "default_migration_table" => getenv('THINKORM_DEFAULT_PREFIX','ra_') . "migrations",
         "default_environment"     => "dev",
         "dev"                     => [
             "adapter" => 'mysql',
