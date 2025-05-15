@@ -3,7 +3,7 @@
 namespace Rocareer\WebmanMigration\command;
 
 use Phinx\Console\PhinxApplication;
-use think\facade\Db;
+use plugin\radmin\support\think\orm\Rdb;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputInterface;
@@ -38,9 +38,6 @@ class MigrateRun extends Command
 
 
         // 设置数据库连接
-        Db::setConfig(config('think-orm'));
-        Db::connect('mysql'); // 连接数据库
-
 
         $phinx = new PhinxApplication();
         $phinx->setAutoExit(false);

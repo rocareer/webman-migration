@@ -19,7 +19,7 @@ return [
         "default_environment"     => "dev",
         "dev"                     => [
             "adapter" => 'mysql',
-            "host"    => getenv('THINKORM_DEFAULT_HOST', ''),
+            "host"    => getenv('THINKORM_DEFAULT_HOSTNAME', ''),
             "name"    => getenv('THINKORM_DEFAULT_DATABASE', ''),
             "user"    => getenv('THINKORM_DEFAULT_USERNAME', ''),
             "pass"    => getenv('THINKORM_DEFAULT_PASSWORD', ''),
