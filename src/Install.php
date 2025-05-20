@@ -4,7 +4,6 @@ namespace Rocareer\WebmanMigration;
 class Install
 {
     const WEBMAN_PLUGIN = true;
-
     /**
      * @var array
      */
