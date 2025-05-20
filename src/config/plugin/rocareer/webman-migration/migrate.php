@@ -1,33 +1,28 @@
 <?php
 /**
- * File:        migrate.php
- * Author:      albert <albert@rocareer.com>
- * Created:     2025/5/14 10:49
- * Description:
- *
- * Copyright [2014-2026] [https://rocareer.com]
- * Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
+ * File      phinx.php
+ * Author    albert@rocareer.com
+ * Time      2025-04-25 23:17:39
+ * Describe  phinx.php
  */
 return [
     "paths"        => [
         "migrations" => "database/migrations",
         "seeds"      => "database/seeds"
     ],
-    "table_prefix" => getenv('THINKORM_DEFAULT_PREFIX','ra_') ,
+    "table_prefix" => "ra_",
     "environments" => [
-        "default_migration_table" => getenv('THINKORM_DEFAULT_PREFIX','ra_') . "migrations",
+        "default_migration_table" => env('MYSQL_PREFIX','r_') . env('MYSQL_MIGRATION_TABLE', 'migrations'),
         "default_environment"     => "dev",
         "dev"                     => [
             "adapter" => 'mysql',
-            "host"    => getenv('THINKORM_DEFAULT_HOSTNAME', ''),
-            "name"    => getenv('THINKORM_DEFAULT_DATABASE', ''),
-            "user"    => getenv('THINKORM_DEFAULT_USERNAME', ''),
-            "pass"    => getenv('THINKORM_DEFAULT_PASSWORD', ''),
-            "port"    => getenv('THINKORM_DEFAULT_PORT', 3306),
-            "charset" => getenv('THINKORM_DEFAULT_CHARSET', 'utf8'),
-            "prefix"  => getenv('THINKORM_DEFAULT_PREFIX', 'ra_'), // 确保这里有前缀
-
-
+            "host"    => env('MYSQL_HOSTNAME', '127.0.0.1'),
+            "name"    => env('MYSQL_DATABASE', ''),
+            "user"    => env('MYSQL_USERNAME', ''),
+            "pass"    => env('MYSQL_PASSWORD', ''),
+            "port"    => env('MYSQL_HOSTPORT', 3306),
+            "charset" => env('MYSQL_CHARSET', 'utf8'),
+            "prefix"  => env('MYSQL_PREFIX', 'r_'), // 确保这里有前缀
         ],
         'production'              => [
             'adapter' => 'mysql',
