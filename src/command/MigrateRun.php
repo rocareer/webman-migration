@@ -19,7 +19,7 @@ class MigrateRun extends Command
     /**
      * @return void
      */
-    protected function configure()
+    protected function configure(): void
     {
         $this->addArgument('name', InputArgument::OPTIONAL, 'Migration name')
             ->addOption('config', 'c', InputOption::VALUE_REQUIRED, 'Path to the Phinx configuration file', 'phinx.php')
