@@ -2,6 +2,10 @@
 
 ## 未发布（Unreleased）
 
+### 文档
+
+- 补 README：migrate:run 用法、动态扫描包迁移、表前缀统一约定、包级迁移幂等写法（hasTable/hasColumn/hasIndex + getDbPrefix）、migrate.php 配置字段、类参考、卸载
+
 ### 许可与版权
 
 - 许可证由开源协议改为 proprietary（商业/内部专有），不适用任何开源许可证；LICENSE 文件同步替换为 Rocareer 专有许可文本。
