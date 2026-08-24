@@ -1,7 +1,7 @@
 {
   "name": "rocareer/webman-migration",
   "type": "library",
-  "license": "Apache-2.0",
+  "license": "proprietary",
   "description": "Webman plugin rocareer/webman-migration",
   "authors": [
     {

@@ -4,11 +4,11 @@
  *  * // +----------------------------------------------------------------------
  *  * // | Rocareer [ ROC YOUR CAREER ]
  *  * // +----------------------------------------------------------------------
- *  * // | Copyright (c) 2014~2025 Albert@rocareer.com All rights reserved.
+ *  * // | Copyright (c) Rocareer Team. All rights reserved.
  *  * // +----------------------------------------------------------------------
- *  * // | Licensed ( http://www.apache.org/licenses/LICENSE-2.0 )
+ *  * // | Author: albert@rocareer.com
  *  * // +----------------------------------------------------------------------
- *  * // | Author: albert <Albert@rocareer.com>
+ *  * // | Author: albert <albert@rocareer.com>
  *  * // +----------------------------------------------------------------------
  *
  */
@@ -25,7 +25,7 @@ namespace Rocareer\WebmanMigration;
 
 /**
  * MIT License
- * For full license information, please view the LICENSE file that was distributed with this source code.
+ * Author: albert@rocareer.com
  */
 
 use InvalidArgumentException;
