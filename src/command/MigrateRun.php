@@ -82,14 +82,31 @@ class MigrateRun extends Command
     {
         // 获取数据库配置
         $config = config('think-orm.connections.mysql');
-
-        // 设置表前缀
-        if (isset($config['prefix'])) {
-            // 设置 Phinx 配置中的表前缀
-            $phinxConfig = base_path() . '/config/plugin/rocareer/webman-migration/migrate.php';
-            $phinxConfigContent = file_get_contents($phinxConfig);
-            $phinxConfigContent = str_replace('\'prefix\' => \'\',', '\'prefix\' => \'' . $config['prefix'] . '\',', $phinxConfigContent);
-            file_put_contents($phinxConfig, $phinxConfigContent);
+        $prefix = trim((string) ($config['prefix'] ?? ''));
+        if ($prefix === '') {
+            return;
         }
+
+        // 权威模板已按 env 读取（getenv('MYSQL_PREFIX', 'ra_')）：env 给出的前缀与目标一致时无需改写配置，
+        // 否则每次 migrate:run 都会重写该文件，mtime 变化触发 webman 监控全量重载，打断在途队列任务
+        if ($prefix === (string) getenv('MYSQL_PREFIX', 'ra_')) {
+            return;
+        }
+
+        $phinxConfig = base_path() . '/config/plugin/rocareer/webman-migration/migrate.php';
+        if (!is_file($phinxConfig)) {
+            return;
+        }
+        $content = (string) file_get_contents($phinxConfig);
+
+        // 权威模板为 getenv('MYSQL_PREFIX', 'ra_')；旧模板为 'prefix' => '',
+        $updated = str_replace("getenv('MYSQL_PREFIX', 'ra_')", var_export($prefix, true), $content);
+        $updated = str_replace("'prefix' => '',", "'prefix' => '" . $prefix . "',", $updated);
+
+        // 仅内容确实变化时才落盘
+        if ($updated === $content) {
+            return;
+        }
+        file_put_contents($phinxConfig, $updated);
     }
 }
