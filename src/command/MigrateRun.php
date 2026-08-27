@@ -11,6 +11,9 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 
+/**
+ * migrate:run 命令（驱动 Phinx 执行迁移；动态扫描 rocareer 包迁移目录 + 统一表前缀）
+ */
 class MigrateRun extends Command
 {
     protected static $defaultName = 'migrate:run';
@@ -82,7 +85,7 @@ class MigrateRun extends Command
         return self::SUCCESS;
     }
 
-    protected function setTablePrefix()
+    protected function setTablePrefix(): void
     {
         // 获取数据库配置
         $config = config('think-orm.connections.mysql');

@@ -15,7 +15,7 @@ class Install
      * Install
      * @return void
      */
-    public static function install()
+    public static function install(): void
     {
         static::installByRelation();
     }
@@ -24,7 +24,7 @@ class Install
      * Uninstall
      * @return void
      */
-    public static function uninstall()
+    public static function uninstall(): void
     {
         self::uninstallByRelation();
     }
@@ -33,7 +33,7 @@ class Install
      * installByRelation
      * @return void
      */
-    public static function installByRelation()
+    public static function installByRelation(): void
     {
         foreach (static::$pathRelation as $source => $dest) {
             if ($pos = strrpos($dest, '/')) {
@@ -53,7 +53,7 @@ class Install
      * uninstallByRelation
      * @return void
      */
-    public static function uninstallByRelation()
+    public static function uninstallByRelation(): void
     {
         foreach (static::$pathRelation as $source => $dest) {
             $path = base_path()."/$dest";

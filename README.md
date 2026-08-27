@@ -94,10 +94,6 @@ class RadminXxxExample extends AbstractMigration
 |---|---|
 | `Rocareer\WebmanMigration\command\MigrateRun` | `migrate:run` 命令（Symfony Console Command，驱动 PhinxApplication） |
 | `Rocareer\WebmanMigration\Install` | webman 插件安装/卸载（复制/移除 `config/plugin/rocareer/webman-migration`） |
-| `Rocareer\WebmanMigration\AbstractMigration` | Phinx 基类代理（typed 属性 + table/hasTable） |
-| `Rocareer\WebmanMigration\PrefixedTableMigration` | 自动加表前缀迁移基类（`table()`/`hasTable()` 透明加前缀） |
-| `Rocareer\WebmanMigration\Table` | Phinx Table 代理（MIT 自 phinx，支持 plan/action 链） |
-| `Rocareer\WebmanMigration\MigrationInterface` | Phinx 迁移接口（typed） |
 
 ## 卸载
 
