@@ -9,9 +9,6 @@
 - MigrateRun::setTablePrefix 补 : void 返回类型 + 类头中文注释。
 - Install 安装方法补 : void 返回类型。
 - composer.json 补 php >=8.1.0 版本约束。
-
-### 修复
-
 - MigrateRun::setTablePrefix 幂等化：env（MYSQL_PREFIX）给出的前缀与 think-orm 配置一致时不再重写 migrate.php；不一致时也仅在内容实际变化后才落盘。此前每次 migrate:run 都会 file_put_contents 触发文件 mtime 变化，webman 监控检测到 config 变更会全量 reload，打断在途队列任务（如考点生成/试题生成），任务卡在 running。
 
 ### 文档
