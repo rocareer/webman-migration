@@ -51,8 +51,12 @@ class MigrateRun extends Command
             $phinxInput['name'] = $name; // 获取迁移名称
         }
 
-        // 如果指定了配置文件
-        $phinxInput['--configuration'] = base_path() . '/config/plugin/rocareer/webman-migration/migrate.php'; // 修改为你的默认配置文件路径
+        // 配置文件：优先 -c/--config 选项，缺省使用本插件默认迁移配置
+        $config = (string) $input->getOption('config');
+        if ($config === '' || $config === 'phinx.php') {
+            $config = base_path() . '/config/plugin/rocareer/webman-migration/migrate.php';
+        }
+        $phinxInput['--configuration'] = $config;
 
         // 打印调试信息
         $output->writeln('Phinx Input: ' . json_encode($phinxInput, JSON_PRETTY_PRINT));

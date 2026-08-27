@@ -29,7 +29,6 @@ use Cake\Database\Query\InsertQuery;
 use Cake\Database\Query\SelectQuery;
 use Cake\Database\Query\UpdateQuery;
 use Phinx\Db\Adapter\AdapterInterface;
-use Rocareer\WebmanMigration\Table;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -300,7 +299,7 @@ interface MigrationInterface
      * @param array<string, mixed> $options Options
      * @return \Phinx\Db\Table
      */
-    public function table(string $tableName, array $options): Table;
+    public function table(string $tableName, array $options): \Phinx\Db\Table;
 
     /**
      * Perform checks on the migration, printing a warning

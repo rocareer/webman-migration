@@ -24,7 +24,6 @@ namespace Rocareer\WebmanMigration;
 
 use Phinx\Db\Action\RenameTable;
 use Phinx\Migration\AbstractMigration;
-use Rocareer\WebmanMigration\Table;
 use function config;
 
 class PrefixedTableMigration extends AbstractMigration
