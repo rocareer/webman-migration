@@ -20,7 +20,7 @@ return [
     ],
     "table_prefix" => getenv('PG_PREFIX') ?: getenv('MYSQL_PREFIX') ?: 'ra_',
     "environments" => [
-        "default_migration_table" => getenv('PG_PREFIX') ?: getenv('MYSQL_PREFIX') ?: 'ra_' . "migrations",
+        "default_migration_table" => (getenv('PG_PREFIX') ?: getenv('MYSQL_PREFIX') ?: 'ra_') . "migrations",
         "default_environment" => "pg",
         "pg" => [
             "adapter" => 'pgsql',
