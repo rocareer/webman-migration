@@ -1,27 +1,37 @@
 <?php
+
 namespace Rocareer\WebmanMigration;
 
+/**
+ * 插件安装/卸载钩子（WEBMAN_PLUGIN）
+ *
+ * v2 只落盘两份接线配置（app.php / command.php）：
+ * - 迁移配置不落盘 —— 由 PhinxConfig 按环境变量确定性生成（runtime/plugin/webman-migration/），
+ *   宿主零配置文件、零运行期改写，包升级不再互相覆盖
+ * - 旧版（v1）曾落盘 migrate.php / migrate-pg.php：检测到即改名 .bak 保留（`--config` 仍可
+ *   指向自定义 phinx 配置文件）
+ */
 class Install
 {
     const WEBMAN_PLUGIN = true;
-    /**
-     * @var array
-     */
-    protected static $pathRelation = array (
-  'config/plugin/rocareer/webman-migration' => 'config/plugin/rocareer/webman-migration',
-);
+
+    /** @var array 源 => 目标（相对项目根） */
+    protected static $pathRelation = [
+        'config/plugin/rocareer/webman-migration' => 'config/plugin/rocareer/webman-migration',
+    ];
 
     /**
-     * Install
+     * 安装（首次或更新）
      * @return void
      */
     public static function install(): void
     {
         static::installByRelation();
+        static::retireLegacyConfigs();
     }
 
     /**
-     * Uninstall
+     * 卸载
      * @return void
      */
     public static function uninstall(): void
@@ -30,38 +40,53 @@ class Install
     }
 
     /**
-     * installByRelation
+     * v1→v2 过渡：宿主 config 下残留的迁移配置文件改名 .bak
+     * （v2 由代码生成配置，旧文件不再被读取，保留以防自定义内容丢失）
+     * @return void
+     */
+    protected static function retireLegacyConfigs(): void
+    {
+        $dir = base_path() . '/config/plugin/rocareer/webman-migration';
+        foreach (['migrate.php', 'migrate-pg.php'] as $file) {
+            $path = $dir . '/' . $file;
+            if (is_file($path)) {
+                rename($path, $path . '.bak');
+                echo "v2 起迁移配置由代码按环境变量生成：旧配置 $file 已备份为 $file.bak（无自定义可删除）\n";
+            }
+        }
+    }
+
+    /**
+     * 拷贝接线配置到宿主项目（overwrite=true：插件配置以包内为准，升级刷新命令注册等，
+     * 防止 webman copy_dir 默认「存在即跳过」留下宿主旧版配置漂移）
      * @return void
      */
     public static function installByRelation(): void
     {
         foreach (static::$pathRelation as $source => $dest) {
             if ($pos = strrpos($dest, '/')) {
-                $parent_dir = base_path().'/'.substr($dest, 0, $pos);
+                $parent_dir = base_path() . '/' . substr($dest, 0, $pos);
                 if (!is_dir($parent_dir)) {
                     mkdir($parent_dir, 0777, true);
                 }
             }
-            //symlink(__DIR__ . "/$source", base_path()."/$dest");
-            copy_dir(__DIR__ . "/$source", base_path()."/$dest");
-            echo "Create $dest
-";
+            copy_dir(__DIR__ . "/$source", base_path() . "/$dest", true);
+            echo "Create $dest\n";
         }
     }
 
     /**
-     * uninstallByRelation
+     * 移除拷贝到宿主项目的接线配置
      * @return void
      */
     public static function uninstallByRelation(): void
     {
         foreach (static::$pathRelation as $source => $dest) {
-            $path = base_path()."/$dest";
+            $path = base_path() . "/$dest";
             if (!is_dir($path) && !is_file($path)) {
                 continue;
             }
-            echo "Remove $dest
-";
+            echo "Remove $dest\n";
             if (is_file($path) || is_link($path)) {
                 unlink($path);
                 continue;
@@ -69,5 +94,4 @@ class Install
             remove_dir($path);
         }
     }
-    
 }

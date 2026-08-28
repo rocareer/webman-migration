@@ -2,75 +2,45 @@
 
 namespace Rocareer\WebmanMigration\command;
 
-use Phinx\Console\PhinxApplication;
-use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\ArrayInput;
+use Rocareer\WebmanMigration\Channel;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
-use Symfony\Component\Console\Input\InputArgument;
-use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * migrate:pg 命令（驱动 Phinx 对 PostgreSQL 执行 PG 迁移）
+ * migrate:pg —— PostgreSQL 通道迁移
  *
- * 与 migrate:run（MySQL）互补：跑 database/pg-migrations（+ 各 rocareer 包 pg-migrations 目录，由 config 动态 glob），
- * 连接走 migrate-pg.php（PG_* 环境键）。用于 rocareer/memory、rocareer/knowledge 的
- * pgvector 向量体系（建表/建索引/幂等搬移存量 MySQL 向量数据）。
+ * 默认跑 database/pg-migrations（各包向量迁移，连接走 PG_* 环境键）；
+ * 方案 A（PG 单库终局）下业务表迁移也切 PG：--set=all（或 env PG_MIGRATION_SETS=all）
+ * 一并跑 database/migrations —— 业务 + 向量共库共 phinxlog 一次到位。
+ * 与 MySQL 通道（migrate:run）共用同一引擎，行为/输出/退出码完全对齐。
  */
-class MigratePgsql extends Command
+#[AsCommand(name: 'migrate:pg', description: 'Run Phinx migrations against PostgreSQL (pg channel)')]
+class MigratePgsql extends BaseMigrateCommand
 {
-    protected static $defaultName = 'migrate:pg';
-    protected static $defaultDescription = 'Run Phinx migrations against PostgreSQL (pg-migrations)';
+    private ?Channel $channel = null;
 
-    /**
-     * @return void
-     */
     protected function configure(): void
     {
-        $this->addArgument('name', InputArgument::OPTIONAL, 'Migration name')
-            ->addOption('config', 'c', InputOption::VALUE_REQUIRED, 'Path to the Phinx configuration file', 'phinx-pg.php')
-            ->addOption('target', 't', InputOption::VALUE_REQUIRED, 'Target version for the migration');
+        parent::configure();
+        $this->addOption('set', null, InputOption::VALUE_REQUIRED, 'PG 迁移集合：vector（默认）|business|all');
     }
 
-    /**
-     * @param InputInterface $input
-     * @param OutputInterface $output
-     * @return int
-     */
+    protected function channel(): Channel
+    {
+        return $this->channel ??= Channel::pg();
+    }
+
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $phinx = new PhinxApplication();
-        $phinx->setAutoExit(false);
-
-        $phinxInput = [
-            'command' => 'migrate',
-        ];
-
-        if ($name = $input->getArgument('name')) {
-            $phinxInput['name'] = $name;
+        $set = strtolower((string) $input->getOption('set'));
+        try {
+            $this->channel = $set !== '' ? Channel::pg($set) : Channel::pg();
+        } catch (\Throwable $e) {
+            $output->writeln('<error>' . $e->getMessage() . '</error>');
+            return self::FAILURE;
         }
-
-        // 配置文件：优先 -c/--config 选项，缺省使用本插件默认 PG 迁移配置
-        $config = (string) $input->getOption('config');
-        if ($config === '' || $config === 'phinx-pg.php') {
-            $config = base_path() . '/config/plugin/rocareer/webman-migration/migrate-pg.php';
-        }
-        $phinxInput['--configuration'] = $config;
-
-        $output->writeln('Phinx Input: ' . json_encode($phinxInput, JSON_PRETTY_PRINT));
-
-        if ($target = $input->getOption('target')) {
-            $phinxInput['--target'] = $target;
-        }
-
-        $phinxInput = new ArrayInput($phinxInput);
-        $outputBuffer = new BufferedOutput();
-
-        $phinx->run($phinxInput, $outputBuffer);
-
-        $output->writeln($outputBuffer->fetch());
-
-        return self::SUCCESS;
+        return $this->runChannel($this->channel, $input, $output);
     }
 }
