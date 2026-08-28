@@ -14,7 +14,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 /**
  * migrate:pg 命令（驱动 Phinx 对 PostgreSQL 执行 PG 迁移）
  *
- * 与 migrate:run（MySQL）互补：跑 database/pg-migrations（+ vendor/rocareer/*/database/pg-migrations），
+ * 与 migrate:run（MySQL）互补：跑 database/pg-migrations（+ 各 rocareer 包 pg-migrations 目录，由 config 动态 glob），
  * 连接走 migrate-pg.php（PG_* 环境键）。用于 rocareer/memory、rocareer/knowledge 的
  * pgvector 向量体系（建表/建索引/幂等搬移存量 MySQL 向量数据）。
  */
