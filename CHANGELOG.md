@@ -1,5 +1,22 @@
 # Changelog
 
+## [v1.1.0] - 2026-12-06
+
+### PostgreSQL 迁移通道（feat，配合 rocareer/memory|knowledge v3 全 PG 向量体系）
+
+背景：memory/knowledge 向量体系整体迁移到 PostgreSQL + pgvector（ANN 检索，去 MySQL JSON 暴力余弦 + scan_limit 截断）。需要一条与 MySQL 迁移（migrate.php / migrate:run）并行的 PG 迁移通道，跑各包的 `database/pg-migrations`（建表/建 HNSW 索引/幂等搬移存量 MySQL 向量数据）。
+
+- 新增配置 `config/plugin/rocareer/webman-migration/migrate-pg.php`：Phinx pgsql 环境（adapter=pgsql），
+  动态扫描项目 `database/pg-migrations` + `vendor/rocareer/*/database/pg-migrations`（与 MySQL 的
+  database/migrations 分离，互不干扰）；连接走 PG_* 环境键（PG_HOSTNAME/PG_HOSTPORT/PG_USERNAME/
+  PG_PASSWORD/PG_DATABASE/PG_SCHEMA），PG_PREFIX 缺省复用 MYSQL_PREFIX（统一 ra_），默认迁移表
+  `<prefix>migrations`。
+- 新增命令 `php webman migrate:pg`（Rocareer\WebmanMigration\command\MigratePgsql）：驱动 Phinx 跑
+  migrate-pg.php；支持 -c/--config 与 -t/--target（与 migrate:run 同款参数）。
+- 说明：PG 库需先建好并启用 pgvector（`CREATE EXTENSION vector`），见 dev/scripts/pg-provision.sh 与
+  docs/docker-infra.md；PG 迁移内可用 Phinx `$this->execute()` 直连 PG，需要跨库搬移 MySQL 存量数据时
+  用 PDO 直连（env 键）读取 MySQL、经 Phinx 连接写入 PG，全程幂等。
+
 ## 未发布（Unreleased）
 
 

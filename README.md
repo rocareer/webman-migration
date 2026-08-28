@@ -35,6 +35,26 @@ php webman migrate:run --target 20260909000000
 
 命令内部通过 `Symfony Console` ArrayInput 驱动 PhinxApplication，执行前会把 think-orm `connections.mysql.prefix` 写入 migrate.php 模板，保证建表前缀与 ORM 一致。
 
+### PG 迁移（migrate:pg，v1.1.0+）
+
+PostgreSQL + pgvector 向量体系（rocareer/memory、rocareer/knowledge 的向量表/索引/存量搬移）用独立的
+PG 迁移通道，跑各包 `database/pg-migrations`（与 MySQL 的 `database/migrations` 分离）：
+
+```bash
+# 跑全部未执行 PG 迁移（项目 + 所有 rocareer 包）
+php webman migrate:pg
+
+# 指定 Phinx 配置文件（默认 config/plugin/rocareer/webman-migration/migrate-pg.php）
+php webman migrate:pg --config /path/to/phinx-pg.php
+
+# 只跑到指定版本
+php webman migrate:pg --target 20260909000000
+```
+
+前置：PG 库已建好且启用 pgvector（`CREATE EXTENSION vector`，见 dev/scripts/pg-provision.sh 与
+docs/docker-infra.md）；PG 连接走 `PG_*` 环境键（PG_HOSTNAME/PG_HOSTPORT/PG_USERNAME/PG_PASSWORD/
+PG_DATABASE），表前缀 `PG_PREFIX`（缺省复用 `MYSQL_PREFIX`）。
+
 ## 写包迁移（约定）
 
 各包带自己的 `database/migrations` 目录（文件名 `YYYYMMDDHHMMSS_描述.php`），模板以 ai 包为先例：
@@ -92,7 +112,8 @@ class RadminXxxExample extends AbstractMigration
 
 | 类 | 说明 |
 |---|---|
-| `Rocareer\WebmanMigration\command\MigrateRun` | `migrate:run` 命令（Symfony Console Command，驱动 PhinxApplication） |
+| `Rocareer\WebmanMigration\command\MigrateRun` | `migrate:run` 命令（Symfony Console Command，驱动 PhinxApplication，MySQL） |
+| `Rocareer\WebmanMigration\command\MigratePgsql` | `migrate:pg` 命令（v1.1.0，驱动 PhinxApplication，PostgreSQL pg-migrations） |
 | `Rocareer\WebmanMigration\Install` | webman 插件安装/卸载（复制/移除 `config/plugin/rocareer/webman-migration`） |
 
 ## 卸载

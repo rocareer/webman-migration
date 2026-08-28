@@ -8,4 +8,5 @@
 
 return[
     Rocareer\WebmanMigration\command\MigrateRun::class,
+    Rocareer\WebmanMigration\command\MigratePgsql::class,
 ];
