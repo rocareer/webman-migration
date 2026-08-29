@@ -1,16 +1,16 @@
 # rocareer/webman-migration
 
 Webman 迁移基础设施插件：基于 [robmorgan/phinx](https://github.com/cakephp/phinx)（^0.16），
-为 **webman + PostgreSQL**（方案 A：PG 单库终局、MySQL 退役）而生，同时兼容过渡期 MySQL 通道。
+为 **webman + PostgreSQL**（方案 A：PG 单库终局、MySQL 退役）而生——**架构无 MySQL，唯一通道即 PostgreSQL**。
 
 一条命令跑项目自身迁移 + 全家桶各包迁移（装任意 rocareer 插件自动纳入，无需逐个登记），
 配置即代码（按环境变量确定性生成）、零宿主配置文件、运行期零改写、退出码真实可信。
 
 ## 设计（v2）
 
-- **通道（Channel）**：`MySQL`（`database/migrations`，MYSQL_* 环境键）与 `PostgreSQL`
-  （`database/pg-migrations`，PG_* 环境键）两条独立通道，共用同一引擎。
-  PG 通道是头等公民：支持 schema、pgvector 迁移、迁移集合配置。
+- **通道（Channel）**：唯一通道 `PostgreSQL`（`database/pg-migrations` + `database/migrations`，
+  均走 PG_* 环境键），按迁移集合配置合并目录；支持 schema、pgvector 迁移。
+  旧 MySQL 通道已随 2026-12-06 v2.1.0 移除（方案 A 全 PG）。
 - **配置即代码**：Phinx 配置由 `PhinxConfig` 按环境变量确定性生成到
   `runtime/plugin/webman-migration/migrate-<通道>.php`（内容未变化不落盘，原子写入）。
   宿主不再有 migrate.php / migrate-pg.php 配置文件，也不会有「旧配置被覆盖 / 双份漂移 /
@@ -23,10 +23,10 @@ Webman 迁移基础设施插件：基于 [robmorgan/phinx](https://github.com/ca
 
 | 命令 | 作用 |
 |---|---|
-| `php webman migrate:run` | MySQL 通道迁移（业务库，过渡期主力） |
-| `php webman migrate:pg` | PostgreSQL 通道迁移（向量库；`--set=all` 含业务表，终局形态） |
-| `php webman migrate:all` | 全部通道：先 MySQL 后 PG，任一失败立即中止（部署首选） |
-| `php webman migrate:status` | 列出各通道已执行/待执行/缺文件迁移（`--channel` 单通道，`--json` 机器可读） |
+| `php webman migrate:run` | PG 通道全量迁移（业务+向量，等价 `migrate:pg --set=all`，历史命令名保留） |
+| `php webman migrate:pg` | PG 通道迁移（默认向量集合；`--set=all` 含业务表，终局形态） |
+| `php webman migrate:all` | PG 全量迁移（等价 `migrate:run`，任一失败立即中止，部署首选） |
+| `php webman migrate:status` | 列出 PG 通道已执行/待执行/缺文件迁移（`--channel=pg`，`--json` 机器可读） |
 
 通用参数（migrate:run / migrate:pg）：
 
@@ -65,13 +65,11 @@ PHP webman migrate:pg --set=all -x               # 终局预检（只出 SQL）
 
 ## 环境变量（配置即代码的唯一输入）
 
-| 通道 | 键 | 缺省 |
-|---|---|---|
-| MySQL | `MYSQL_HOSTNAME` `MYSQL_HOSTPORT` `MYSQL_DATABASE` `MYSQL_USERNAME` `MYSQL_PASSWORD` `MYSQL_CHARSET` | 127.0.0.1 / 3306 / radmin / root / 123456 / utf8mb4 |
-| MySQL | `MYSQL_PREFIX` | `ra_` |
-| PG | `PG_HOSTNAME` `PG_HOSTPORT` `PG_DATABASE` `PG_USERNAME` `PG_PASSWORD` `PG_SCHEMA` | 127.0.0.1 / 5433 / radmin / root / 123456 / public |
-| PG | `PG_PREFIX`（缺省回退 `MYSQL_PREFIX`，再回退 `ra_`） | `ra_` |
-| PG | `PG_MIGRATION_SETS` | `vector` |
+| 键 | 缺省 |
+|---|---|
+| `PG_HOSTNAME` `PG_HOSTPORT` `PG_DATABASE` `PG_USERNAME` `PG_PASSWORD` `PG_SCHEMA` | 127.0.0.1 / 5433 / radmin / root / 123456 / public |
+| `PG_PREFIX` | `ra_` |
+| `PG_MIGRATION_SETS` | `vector` |
 
 - 表前缀口径与 radmin 的 `getDbPrefix()`/`getPgPrefix()` 完全一致；
   迁移代码里一律显式 `getDbPrefix()`/`getPgPrefix()`（工作区惯例）
@@ -80,8 +78,8 @@ PHP webman migrate:pg --set=all -x               # 终局预检（只出 SQL）
 
 ## 写包迁移（约定）
 
-各包带 `database/migrations`（MySQL 通道）；PG 专用迁移（向量等）放
-`database/pg-migrations`（PG 通道文件夹）。文件名
+各包带 `database/migrations`（业务表）；PG 专用迁移（向量等）放
+`database/pg-migrations`。文件名
 `YYYYMMDDHHMMSS_<包标识>_<描述>.php`（时间戳全局唯一），类名 `Radmin<包>Xxx`
 （或包前缀），模板以 ai 包为先例；**幂等铁律**：CREATE 前 `hasTable`、ALTER 前
 `hasColumn`/`hasIndex`，数据修复用 WHERE 守卫 / `INSERT ... ON DUPLICATE KEY UPDATE`；
@@ -96,7 +94,7 @@ class RadminAiExample extends AbstractMigration
 {
     public function up()
     {
-        $table = getDbPrefix() . 'example';          // PG 通道用 getPgPrefix()
+        $table = getPgPrefix() . 'example';           // 前缀统一 getPgPrefix()（= getDbPrefix()）
         if ($this->hasTable($table)) { return; }      // 幂等守卫
         $this->table($table)->addColumn(...)->create();
     }
@@ -115,7 +113,7 @@ class RadminAiExample extends AbstractMigration
 同样通过 `--config` + phinx 直接调用：
 
 ```bash
-vendor/bin/phinx rollback -c runtime/plugin/webman-migration/migrate-mysql.php   # 回滚上一个迁移
+vendor/bin/phinx rollback -c runtime/plugin/webman-migration/migrate-pg.php      # 回滚上一个迁移
 vendor/bin/phinx status -c runtime/plugin/webman-migration/migrate-pg.php
 ```
 
@@ -137,7 +135,7 @@ php webman plugin:install rocareer/webman-migration
 
 | 类 | 说明 |
 |---|---|
-| `Rocareer\WebmanMigration\Channel` | 通道值对象：MySQL/PG 的目录、前缀、连接参数、迁移集合 |
+| `Rocareer\WebmanMigration\Channel` | 通道值对象：PG 的目录、前缀、连接参数、迁移集合 |
 | `Rocareer\WebmanMigration\PhinxConfig` | 按通道确定性生成 phinx 配置（runtime 目录，原子写入） |
 | `Rocareer\WebmanMigration\command\BaseMigrateCommand` | 命令引擎：配置解析/参数透传/退出码透传 |
 | `...\command\MigrateRun/MigratePgsql/MigrateAll/MigrateStatus` | 四个命令 |

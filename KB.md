@@ -8,9 +8,9 @@ rocareer/webman-migration 是运行在 Webman 应用上的**数据库迁移管�
 引擎（Phinx）封装为 Webman 插件命令，让项目与全家桶各插件**一键执行数据库结构变更**——建表、
 加字段、加索引、改表结构，均通过可版本化的迁移脚本完成，任何环境都能一致升级到目标结构。
 
-它专为 **webman + PostgreSQL** 终局形态设计（方案 A：PG 单库，MySQL 退役），同时兼容过渡期的
-MySQL 通道：MySQL（业务库）与 PostgreSQL（向量库/终局业务库）各为一条迁移通道，共用同一引擎，
-安装任意 rocareer 插件后其迁移自动纳入，无需逐包登记。
+它专为 **webman + PostgreSQL** 终局形态设计（方案 A：PG 单库、MySQL 退役）——**架构无 MySQL，
+唯一迁移通道即 PostgreSQL**（业务表与向量表共库共前缀）。安装任意 rocareer 插件后其迁移自动
+纳入，无需逐包登记。
 
 ## 用途与意义
 
@@ -21,8 +21,8 @@ MySQL 通道：MySQL（业务库）与 PostgreSQL（向量库/终局业务库）
 
 ## 主要功能
 
-- **一键执行全部迁移**：`migrate:run`（MySQL）/ `migrate:pg`（PostgreSQL）/ `migrate:all`
-  （先 MySQL 后 PG，任一失败即止）——部署时一条命令到位。
+- **一键执行全部迁移**：`migrate:run` / `migrate:pg`（PostgreSQL，业务+向量全量）/ `migrate:all`
+  （架构无 MySQL：三者均跑 PG 通道全量，任一失败即止）——部署时一条命令到位。
 - **自动发现插件迁移**：项目 `database` 下迁移目录 + 各插件自带迁移目录动态合并，装新插件即纳入。
 - **PG 终局迁移集合**：`migrate:pg --set=all`（或环境变量 `PG_MIGRATION_SETS=all`）可在
   PostgreSQL 单库一次跑通业务表迁移 + 向量迁移，共用一个迁移记录表。
@@ -36,7 +36,7 @@ MySQL 通道：MySQL（业务库）与 PostgreSQL（向量库/终局业务库）
 
 ## 关键概念
 
-- **迁移通道**：MySQL 与 PostgreSQL 各一条通道；通道 = 迁移目录集合 + 目标数据库连接。
+- **迁移通道**：唯一通道 PostgreSQL；通道 = 迁移目录集合 + 目标数据库连接（PG_* 环境键）。
 - **迁移集合（PG）**：PG 通道可只跑向量迁移（默认，过渡期）、只跑业务表迁移（business）、
   或全量（all，终局）。
 - **迁移来源**：项目自身迁移目录 + 各插件携带迁移目录，插件安装即自动纳入。
@@ -49,9 +49,9 @@ MySQL 通道：MySQL（业务库）与 PostgreSQL（向量库/终局业务库）
 本插件为命令行/运维入口，无需后台菜单。在 Webman 项目根目录执行：
 
 ```bash
-php webman migrate:all        # 部署首选：先 MySQL 后 PG，任一失败即中止
+php webman migrate:all        # 部署首选：PG 业务+向量全量，任一失败即中止
 php webman migrate:status     # 查看迁移状态
-php webman migrate:run --dry-run   # MySQL 通道预检（只输出 SQL 不落库）
+php webman migrate:run --dry-run   # 全量预检（只输出 SQL 不落库）
 ```
 
 安装即可用；卸载仅移除接线配置，已执行的迁移与已建数据不删除，数据归项目所有。
