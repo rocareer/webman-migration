@@ -3,23 +3,21 @@
 namespace Rocareer\WebmanMigration;
 
 /**
- * 迁移通道：一个通道 = 一套迁移目录 + 一个目标数据库（MySQL | PostgreSQL）。
+ * 迁移通道：一个通道 = 一套迁移目录 + 一个目标数据库（PostgreSQL）。
  *
- * - MySQL 通道（migrate:run）：跑 database/migrations（连接走 MYSQL_* 环境键）
- * - PostgreSQL 通道（migrate:pg）：跑 database/pg-migrations（默认，向量体系）；
- *   终局跑全量时用 `PG_MIGRATION_SETS=all`（或 --set=business|all）一并纳入 database/migrations
- *   —— 方案 A（PG 单库终局、MySQL 退役）下业务表迁移 + 向量迁移共库共 phinxlog 一次跑通
+ * 架构无 MySQL（PG 单库终局、MySQL 退役）：v2.0.0 的 MySQL 通道已移除，唯一通道即 PostgreSQL。
+ * - migrate:run —— 历史命令名保留，语义 = PG 通道全量（业务 + 向量，等价 migrate:pg --set=all）
+ * - migrate:pg  —— PG 通道（向量默认 / --set=business|all 切换）
+ * - migrate:all —— 全通道（现等价 migrate:pg --set=all）
  *
- * 表前缀口径与 radmin 的 getDbPrefix()/getPgPrefix() 完全一致（PG 优先 PG_PREFIX，
- * 回退 MYSQL_PREFIX，最终缺省 ra_）；Phinx 迁移记录表为 <prefix>migrations，与 v1 保持一致
- * —— 旧部署的历史执行记录持续有效，升级 v2 不会重跑已执行迁移。
+ * 表前缀口径与 radmin 的 getPgPrefix() 完全一致（PG_PREFIX，缺省 ra_）；Phinx 迁移记录表
+ * 为 <prefix>migrations，与 v1 保持一致——历史执行记录持续有效，升级不会重跑已执行迁移。
  *
  * 本包只负责「迁移执行自动发现」，不替迁移代码加前缀：迁移里一律显式
  * getDbPrefix()/getPgPrefix()（工作区惯例，避免 phinx 自动前缀与显式前缀叠加成双前缀）。
  */
 final class Channel
 {
-    public const MYSQL = 'mysql';
     public const PG = 'pg';
 
     /** PG 通道迁移集合：vector（默认，仅 pg-migrations）/ business（仅 migrations）/ all（两者） */
@@ -32,29 +30,21 @@ final class Channel
 
     private function __construct(private string $name, private ?string $pgSet = null)
     {
-        if ($this->name === self::PG) {
-            $this->pgSet = $pgSet ?? strtolower(self::env(self::PG_SET_ENV, self::PG_SET_VECTOR));
-            if (!in_array($this->pgSet, [self::PG_SET_VECTOR, self::PG_SET_BUSINESS, self::PG_SET_ALL], true)) {
-                throw new \InvalidArgumentException(sprintf(
-                    '%s 仅支持 %s|%s|%s，实际：%s',
-                    self::PG_SET_ENV,
-                    self::PG_SET_VECTOR,
-                    self::PG_SET_BUSINESS,
-                    self::PG_SET_ALL,
-                    $this->pgSet
-                ));
-            }
+        $this->pgSet = $pgSet ?? strtolower(self::env(self::PG_SET_ENV, self::PG_SET_VECTOR));
+        if (!in_array($this->pgSet, [self::PG_SET_VECTOR, self::PG_SET_BUSINESS, self::PG_SET_ALL], true)) {
+            throw new \InvalidArgumentException(sprintf(
+                '%s 仅支持 %s|%s|%s，实际：%s',
+                self::PG_SET_ENV,
+                self::PG_SET_VECTOR,
+                self::PG_SET_BUSINESS,
+                self::PG_SET_ALL,
+                $this->pgSet
+            ));
         }
     }
 
-    /** MySQL 通道：radmin 核心业务库 + 各包传统 MySQL 迁移（过渡期仍在用） */
-    public static function mysql(): self
-    {
-        return new self(self::MYSQL);
-    }
-
     /**
-     * PostgreSQL 通道：pgvector 向量体系（memory/knowledge 建表/索引/存量搬移等）。
+     * PostgreSQL 通道：pgvector 向量体系（memory/knowledge 建表/索引等）与业务表共库共 phinxlog。
      *
      * @param string|null $pgSet 覆盖 PG_MIGRATION_SETS：vector|business|all，null=按环境键
      */
@@ -63,10 +53,10 @@ final class Channel
         return new self(self::PG, $pgSet);
     }
 
-    /** @return self[] 全部通道（migrate:all / migrate:status 执行顺序：MySQL → PG） */
+    /** @return self[] 全部通道（现仅 PG；migrate:all / migrate:status 的兼容迭代入口） */
     public static function all(): array
     {
-        return [self::mysql(), self::pg()];
+        return [self::pg()];
     }
 
     public function name(): string
@@ -76,20 +66,17 @@ final class Channel
 
     public function label(): string
     {
-        return $this->name === self::PG ? 'PostgreSQL' : 'MySQL';
+        return 'PostgreSQL';
     }
 
     public function adapter(): string
     {
-        return $this->name === self::PG ? 'pgsql' : 'mysql';
+        return 'pgsql';
     }
 
-    /** database/ 下的迁移子目录集合（PG 通道按集合配置合并；MySQL 固定 migrations） */
+    /** database/ 下的迁移子目录集合（PG 通道按集合配置合并） */
     public function migrationDirs(): array
     {
-        if ($this->name === self::MYSQL) {
-            return ['migrations'];
-        }
         return match ($this->pgSet) {
             self::PG_SET_BUSINESS => ['migrations'],
             self::PG_SET_ALL => ['migrations', 'pg-migrations'],
@@ -97,24 +84,18 @@ final class Channel
         };
     }
 
-    /** PG 通道集合的中文说明（用于命令输出；MySQL 返回空） */
+    /** PG 通道集合的中文说明（用于命令输出） */
     public function pgSetLabel(): string
     {
-        if ($this->name === self::MYSQL) {
-            return '';
-        }
         return $this->pgSet === self::PG_SET_ALL
             ? '业务+向量（全量）'
             : ($this->pgSet === self::PG_SET_BUSINESS ? '业务' : '向量');
     }
 
-    /** 表前缀（与 radmin helpers 口径一致）：PG 优先 PG_PREFIX，最终缺省 ra_ */
+    /** 表前缀（与 radmin getPgPrefix 口径一致）：PG_PREFIX，缺省 ra_ */
     public function tablePrefix(): string
     {
-        $prefix = $this->name === self::PG
-            ? (self::env('PG_PREFIX', '') ?: self::env('MYSQL_PREFIX', '') ?: 'ra_')
-            : (self::env('MYSQL_PREFIX', '') ?: 'ra_');
-        return $prefix;
+        return self::env('PG_PREFIX', '') ?: 'ra_';
     }
 
     /** Phinx 迁移记录表名：<prefix>migrations（v1 起沿用，不因版本升级丢失历史） */
@@ -146,25 +127,14 @@ final class Channel
     /** 数据库连接参数（env 驱动；缺省值对齐 dev 各工程 .env 模板） */
     public function connection(): array
     {
-        if ($this->name === self::PG) {
-            return [
-                'adapter' => 'pgsql',
-                'host'    => self::env('PG_HOSTNAME', '127.0.0.1'),
-                'port'    => self::env('PG_HOSTPORT', '5433'),
-                'name'    => self::env('PG_DATABASE', 'radmin'),
-                'user'    => self::env('PG_USERNAME', 'root'),
-                'pass'    => self::env('PG_PASSWORD', '123456'),
-                'schema'  => self::env('PG_SCHEMA', 'public'),
-            ];
-        }
         return [
-            'adapter' => 'mysql',
-            'host'    => self::env('MYSQL_HOSTNAME', '127.0.0.1'),
-            'port'    => self::env('MYSQL_HOSTPORT', '3306'),
-            'name'    => self::env('MYSQL_DATABASE', 'radmin'),
-            'user'    => self::env('MYSQL_USERNAME', 'root'),
-            'pass'    => self::env('MYSQL_PASSWORD', '123456'),
-            'charset' => self::env('MYSQL_CHARSET', 'utf8mb4'),
+            'adapter' => 'pgsql',
+            'host'    => self::env('PG_HOSTNAME', '127.0.0.1'),
+            'port'    => self::env('PG_HOSTPORT', '5433'),
+            'name'    => self::env('PG_DATABASE', 'radmin'),
+            'user'    => self::env('PG_USERNAME', 'root'),
+            'pass'    => self::env('PG_PASSWORD', '123456'),
+            'schema'  => self::env('PG_SCHEMA', 'public'),
         ];
     }
 

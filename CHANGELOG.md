@@ -1,5 +1,13 @@
 # Changelog
 
+## [v2.1.0] - 2026-12-06
+
+### PG-only 通道收口：移除 MySQL 通道（方案 A 已全 PG，MySQL 退役）
+- 删除 Channel::mysql()/MYSQL 常量与 MYSQL_* 连接分支；连接/前缀仅 PG（PG_PREFIX 缺省 ra_）
+- migrate:run 语义 = PG 通道全量（业务+向量，等价 migrate:pg --set=all），历史命令名不变、README/dev 流程无缝
+- migrate:all = PG 全量（fail-fast）；migrate:status --channel 仅接受 pg
+
+
 ## [v2.0.0] - 2026-12-06
 
 ### 重构：配置即代码 + 通道化引擎 + 退出码真实化（方案 A：专为 webman PG 而生）

@@ -14,7 +14,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  * 默认跑 database/pg-migrations（各包向量迁移，连接走 PG_* 环境键）；
  * 方案 A（PG 单库终局）下业务表迁移也切 PG：--set=all（或 env PG_MIGRATION_SETS=all）
  * 一并跑 database/migrations —— 业务 + 向量共库共 phinxlog 一次到位。
- * 与 MySQL 通道（migrate:run）共用同一引擎，行为/输出/退出码完全对齐。
+ * 架构无 MySQL：与 migrate:run（等价 PG 全量）共用同一引擎，行为/输出/退出码完全对齐。
  */
 #[AsCommand(name: 'migrate:pg', description: 'Run Phinx migrations against PostgreSQL (pg channel)')]
 class MigratePgsql extends BaseMigrateCommand

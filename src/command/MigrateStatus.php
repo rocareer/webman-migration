@@ -13,19 +13,19 @@ use Symfony\Component\Console\Command\Command;
 /**
  * migrate:status —— 迁移状态查看（运维必备）
  *
- * 缺省列出全部通道（MySQL → PG）的已执行/待执行迁移；
- * --channel=mysql|pg 只看单通道；--json 配合单通道输出机器可读 JSON（供 CI/监控解析）。
+ * 架构无 MySQL（PG 单库终局）：列出 PG 通道的已执行/待执行迁移；
+ * --channel=pg 显式指定（旧 mysql 通道已退役）；--json 输出机器可读 JSON（供 CI/监控解析）。
  * 退出码透传 phinx status：0=全部已执行；1=运行错误；2=存在「已记录但文件缺失/重命名」
  * 的历史版本（安全，不会重跑）；3=存在未执行迁移。
  */
-#[AsCommand(name: 'migrate:status', description: 'Show migration status for MySQL and PostgreSQL channels')]
+#[AsCommand(name: 'migrate:status', description: 'Show migration status (PG channel)')]
 class MigrateStatus extends BaseMigrateCommand
 {
     protected function configure(): void
     {
         parent::configure();
-        $this->addOption('channel', null, InputOption::VALUE_REQUIRED, '只看指定通道：mysql|pg（缺省全部）')
-            ->addOption('json', null, InputOption::VALUE_NONE, '以 JSON 输出（仅适用于 --channel 单通道）')
+        $this->addOption('channel', null, InputOption::VALUE_REQUIRED, '只看指定通道：pg（缺省全部）')
+            ->addOption('json', null, InputOption::VALUE_NONE, '以 JSON 输出')
             ->addOption('set', null, InputOption::VALUE_REQUIRED, 'PG 通道迁移集合：vector（默认）|business|all');
     }
 
@@ -47,14 +47,14 @@ class MigrateStatus extends BaseMigrateCommand
 
         $channels = Channel::all();
         if ($channel !== '') {
-            if ($channel !== Channel::MYSQL && $channel !== Channel::PG) {
-                $output->writeln('<error>--channel 仅支持 mysql|pg，实际为：' . $channel . '</error>');
+            if ($channel !== Channel::PG) {
+                $output->writeln('<error>--channel 仅支持 pg（MySQL 通道已于 2026-08-29 退役），实际为：' . $channel . '</error>');
                 return Command::FAILURE;
             }
-            $channels = [$channel === Channel::PG ? Channel::pg($set !== '' ? $set : null) : Channel::mysql()];
+            $channels = [Channel::pg($set !== '' ? $set : null)];
         }
         if ($wantJson && count($channels) > 1) {
-            $output->writeln('<error>--json 只支持单通道，请加 --channel=mysql 或 --channel=pg</error>');
+            $output->writeln('<error>--json 只支持单通道，请加 --channel=pg</error>');
             return Command::FAILURE;
         }
 

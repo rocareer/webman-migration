@@ -11,18 +11,18 @@ use Symfony\Component\Console\Output\OutputInterface;
 /**
  * migrate:all —— 一键跑全部通道迁移（部署首选）
  *
- * 按顺序执行：MySQL 通道（migrate:run）→ PostgreSQL 通道（migrate:pg），
- * 任一通道失败立即中止并以非零退出码结束（fail-fast），成功才继续下一通道。
+ * 架构无 MySQL（PG 单库终局）：唯一通道即 PostgreSQL（migrate:pg），本命令等价
+ * `migrate:pg --set=all`（业务 + 向量全量，失败即非零退出 fail-fast）。
  * --set 作用于 PG 通道（vector|business|all，同 migrate:pg）。
- * 本命令不带 --config/--target（两通道各自的配置与版本号无意义），
+ * 本命令不带 --config/--target（通道各自的配置与版本号无意义），
  * 需要精细控制请分别用 migrate:run / migrate:pg。
  */
-#[AsCommand(name: 'migrate:all', description: 'Run all pending migrations: MySQL channel first, then PostgreSQL (fail fast)')]
+#[AsCommand(name: 'migrate:all', description: 'Run all pending migrations (PG channel, business + vector, fail fast)')]
 class MigrateAll extends BaseMigrateCommand
 {
     protected function configure(): void
     {
-        $this->addOption('dry-run', 'x', InputOption::VALUE_NONE, '只输出两通道将执行的 SQL，不落库')
+        $this->addOption('dry-run', 'x', InputOption::VALUE_NONE, '只输出将执行的 SQL，不落库')
             ->addOption('set', null, InputOption::VALUE_REQUIRED, 'PG 通道迁移集合：vector（默认）|business|all');
     }
 

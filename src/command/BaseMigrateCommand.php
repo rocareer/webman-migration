@@ -26,11 +26,11 @@ use Symfony\Component\Console\Output\OutputInterface;
 abstract class BaseMigrateCommand extends Command
 {
     /**
-     * 本命令服务的通道（缺省 MySQL；migrate:pg 覆盖为 PG；migrate:all 自管理多通道）
+     * 本命令服务的通道（架构无 MySQL：缺省即 PG 全量；migrate:pg 可切 --set）
      */
     protected function channel(): Channel
     {
-        return Channel::mysql();
+        return Channel::pg(Channel::PG_SET_ALL);
     }
 
     /** phinx 子命令名：migrate（默认）| status */
