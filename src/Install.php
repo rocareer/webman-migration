@@ -22,9 +22,21 @@ class Install
 
     /**
      * 安装（首次或更新）
+     *
+     * @param bool $isFirst 是否首次安装（composer require 时为 true，update 回退时为 false）
      * @return void
      */
-    public static function install(): void
+    public static function install($isFirst = true): void
+    {
+        static::installByRelation();
+        static::retireLegacyConfigs();
+    }
+
+    /**
+     * 更新：刷新接线配置 + 旧配置退役（升级专属钩子，官方 Plugin::update 调用）
+     * @return void
+     */
+    public static function update(): void
     {
         static::installByRelation();
         static::retireLegacyConfigs();
@@ -81,17 +93,34 @@ class Install
      */
     public static function uninstallByRelation(): void
     {
-        foreach (static::$pathRelation as $source => $dest) {
-            $path = base_path() . "/$dest";
-            if (!is_dir($path) && !is_file($path)) {
-                continue;
-            }
-            echo "Remove $dest\n";
-            if (is_file($path) || is_link($path)) {
+        foreach (array_reverse(static::$pathRelation) as $source => $dest) {
+            $path = base_path() . '/' . $dest;
+            if (is_dir($path) && !is_link($path)) {
+                static::removeDir($path);
+                echo "Remove $dest\n";
+            } elseif (is_file($path)) {
                 unlink($path);
+                echo "Remove $dest\n";
+            }
+        }
+    }
+
+    /**
+     * 递归删除目录
+     * @return void
+     */
+    protected static function removeDir(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+        foreach (scandir($dir) ?: [] as $item) {
+            if ($item === '.' || $item === '..') {
                 continue;
             }
-            remove_dir($path);
+            $path = $dir . '/' . $item;
+            is_dir($path) ? static::removeDir($path) : unlink($path);
         }
+        rmdir($dir);
     }
 }

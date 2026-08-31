@@ -1,5 +1,15 @@
 # Changelog
 
+## [v2.1.1] - 2026-08-31
+
+### Install.php 标准化（docs/install-standard.md）
+
+- 补 `update()` 钩子（升级刷新接线配置 + 旧配置退役，官方 Plugin::update 直接调用）；
+  `install($isFirst = true)` 签名兼容官方传参。
+- uninstallByRelation 去官方 remove_dir() 骨架残留，自实现递归删除；
+  copy_dir(..., true) 保留（接线配置以包内为准刷新，注释已声明）。
+- rocareer:audit install_standard 规则全绿。
+
 ## [v2.1.0] - 2026-12-06
 
 ### PG-only 通道收口：移除 MySQL 通道（方案 A 已全 PG，MySQL 退役）
