@@ -23,7 +23,7 @@ class MigrateAll extends BaseMigrateCommand
     protected function configure(): void
     {
         $this->addOption('dry-run', 'x', InputOption::VALUE_NONE, '只输出将执行的 SQL，不落库')
-            ->addOption('set', null, InputOption::VALUE_REQUIRED, 'PG 通道迁移集合：vector（默认）|business|all');
+            ->addOption('set', null, InputOption::VALUE_REQUIRED, 'PG 通道迁移集合：all（默认）|vector|business');
     }
 
     protected function phinxOptions(): array
@@ -34,8 +34,13 @@ class MigrateAll extends BaseMigrateCommand
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $set = strtolower((string) $input->getOption('set'));
+        // v2.4.1：缺省对齐自身文档与 migrate:run（全量集）——原缺省跟随 PG_MIGRATION_SETS
+        // 环境键（缺省 vector），「部署首选」实际只跑向量集属欠扫
+        if ($set === '') {
+            $set = Channel::PG_SET_ALL;
+        }
         foreach (Channel::all() as $channel) {
-            if ($set !== '' && $channel->name() === Channel::PG) {
+            if ($channel->name() === Channel::PG) {
                 try {
                     $channel = Channel::pg($set);
                 } catch (\Throwable $e) {

@@ -26,7 +26,7 @@ class MigrateStatus extends BaseMigrateCommand
         parent::configure();
         $this->addOption('channel', null, InputOption::VALUE_REQUIRED, '只看指定通道：pg（缺省全部）')
             ->addOption('json', null, InputOption::VALUE_NONE, '以 JSON 输出')
-            ->addOption('set', null, InputOption::VALUE_REQUIRED, 'PG 通道迁移集合：vector（默认）|business|all');
+            ->addOption('set', null, InputOption::VALUE_REQUIRED, 'PG 通道迁移集合：all（默认）|vector|business');
     }
 
     protected function phinxCommand(): string
@@ -44,6 +44,11 @@ class MigrateStatus extends BaseMigrateCommand
         $wantJson = (bool) $input->getOption('json');
         $channel = strtolower((string) $input->getOption('channel'));
         $set = strtolower((string) $input->getOption('set'));
+        // v2.4.1：缺省对齐 migrate:run（全量集）——status 只扫 vector 集时，业务集的
+        // phinxlog 历史行会被误报「已记录但文件缺失」（MISSING，退出码 2 假红）
+        if ($set === '') {
+            $set = Channel::PG_SET_ALL;
+        }
 
         $channels = Channel::all();
         if ($channel !== '') {
@@ -51,7 +56,7 @@ class MigrateStatus extends BaseMigrateCommand
                 $output->writeln('<error>--channel 仅支持 pg（MySQL 通道已于 2026-08-29 退役），实际为：' . $channel . '</error>');
                 return Command::FAILURE;
             }
-            $channels = [Channel::pg($set !== '' ? $set : null)];
+            $channels = [Channel::pg($set)];
         }
         if ($wantJson && count($channels) > 1) {
             $output->writeln('<error>--json 只支持单通道，请加 --channel=pg</error>');
