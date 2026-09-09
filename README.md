@@ -23,11 +23,16 @@ Webman 迁移基础设施插件：基于 [robmorgan/phinx](https://github.com/ca
 
 | 命令 | 作用 |
 |---|---|
+| `php webman migrate:create <name>` | 创建迁移文件：真实时间戳 + 全量集合查重，撞号自动 +1 秒顺延；`--dir=pg-migrations` 选向量集合，`--pkg=<包名>` 直接落到包源码（dev 宿主 vendor 为 symlink） |
 | `php webman migrate:run` | PG 通道全量迁移（业务+向量，等价 `migrate:pg --set=all`，历史命令名保留） |
 | `php webman migrate:pg` | PG 通道迁移（默认向量集合；`--set=all` 含业务表，终局形态） |
 | `php webman migrate:all` | PG 全量迁移（等价 `migrate:run`，任一失败立即中止，部署首选） |
 | `php webman migrate:status` | 列出 PG 通道已执行/待执行/缺文件迁移（`--channel=pg`，`--json` 机器可读） |
 | `php webman migrate:prune` | 清理「已记录但文件缺失」的历史迁移记录（dry-run 缺省，`--apply` 实删；对照全量集合，只动记录表） |
+
+> **撞号强制预检（v2.3.0）**：migrate:run / pg / all / status 起步即扫本次装载目录，版本号
+> 重复直接中止并输出撞号文件与修复指引——不再让 Phinx 加载阶段抛晦涩的 Duplicate migration。
+> **新迁移一律用 `migrate:create` 生成**，禁止手编「日期 + 整点 000000」时间戳（分秒位浪费且撞车高发）。
 
 通用参数（migrate:run / migrate:pg）：
 

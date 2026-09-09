@@ -66,6 +66,10 @@ abstract class BaseMigrateCommand extends Command
      */
     protected function runChannel(Channel $channel, InputInterface $input, OutputInterface $output, array $forced = []): int
     {
+        if ($this->reportVersionConflicts($channel, $output)) {
+            return self::FAILURE;
+        }
+
         $configPath = $this->resolveConfig($channel, $input, $output);
         if ($configPath === null) {
             return self::FAILURE;
@@ -123,6 +127,45 @@ abstract class BaseMigrateCommand extends Command
         // phinx 退出码原样透传（0=成功；migrate 失败为 1；status 另有 2=记录缺文件 / 3=存在未执行），
         // CI/部署脚本可依赖非零判断
         return $code;
+    }
+
+    /**
+     * 撞号强制预检：扫描本次通道装载的全部迁移目录，版本号重复直接中止。
+     *
+     * Phinx 加载阶段撞号抛 InvalidArgumentException（Duplicate migration），不带文件
+     * 位置与修复指引，且全部迁移（含无关包）都跑不了；此处提前拦截并给出修复路径。
+     * 返回 true = 存在撞号（调用方应返回 FAILURE）。
+     */
+    private function reportVersionConflicts(Channel $channel, OutputInterface $output): bool
+    {
+        $byVersion = [];
+        foreach ($channel->migrationPaths() as $path) {
+            foreach (glob($path . '/*.php') ?: [] as $file) {
+                if (preg_match('/^(\d{14})_/', basename($file), $m)) {
+                    $byVersion[$m[1]][] = $file;
+                }
+            }
+        }
+        $conflicts = array_filter($byVersion, static fn(array $files): bool => count($files) > 1);
+        if ($conflicts === []) {
+            return false;
+        }
+
+        $output->writeln(sprintf(
+            '<error>[%s 通道] 迁移版本号撞车，已强制中止（Phinx 加载阶段撞号会让全部迁移跑不了）：</error>',
+            $channel->label()
+        ));
+        foreach ($conflicts as $version => $files) {
+            $output->writeln("<error>  版本 {$version} 同时存在：</error>");
+            foreach ($files as $file) {
+                $output->writeln('<error>    - ' . $file . '</error>');
+            }
+        }
+        $output->writeln(
+            "<comment>  修复：未发布/未执行的迁移改版本号（已执行迁移改名无效，用 migrate:prune --apply 清旧记录）；\n" .
+            '  新迁移一律用 `php webman migrate:create` 生成（真实时间戳 + 全局查重自动顺延）。</comment>'
+        );
+        return true;
     }
 
     /**

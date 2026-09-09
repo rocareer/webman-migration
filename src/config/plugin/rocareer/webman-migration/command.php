@@ -6,6 +6,7 @@
  * 按环境变量确定性生成到 runtime/plugin/webman-migration/，宿主无需维护迁移配置文件。
  */
 return [
+    Rocareer\WebmanMigration\command\MigrateCreate::class,
     Rocareer\WebmanMigration\command\MigrateRun::class,
     Rocareer\WebmanMigration\command\MigratePgsql::class,
     Rocareer\WebmanMigration\command\MigrateAll::class,

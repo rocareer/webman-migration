@@ -1,5 +1,23 @@
 # Changelog
 
+## [v2.3.0] - 2026-09-09
+
+### 新增：migrate:create 创建迁移（真实时间戳 + 全局查重）+ 运行前撞号强制预检
+
+背景：迁移版本号 = 14 位时间戳，手编「日期 + 整点 000000」风格让分秒位全部浪费
+（工作区 205 个迁移里 44 个 `000000` 后缀），多包同日建迁移频繁撞号——Phinx 加载阶段
+撞号直接抛 Duplicate migration 异常，全部迁移（含无关包）都跑不了，排查靠人工 find 全局查重。
+
+- **`migrate:create <name>`**：版本号用创建那一刻的真实时间（时分秒用满）；写文件前对
+  全量集合（项目 + 全部 `vendor/rocareer/*` × `migrations`/`pg-migrations`，两集合共享
+  Phinx 版本命名空间）查重，撞号自动 +1 秒顺延；顺带查类名重复（防 PHP fatal）；
+  产出幂等迁移骨架（中文注释 + up/down）。`--dir=pg-migrations` 选向量集合，
+  `--pkg=<包名>` 直接落到包源码（dev 宿主 vendor 为 symlink）；
+- **运行前撞号强制预检**：`BaseMigrateCommand::runChannel()` 起步即扫本次通道装载目录，
+  版本号重复直接 FAILURE 中止，输出撞号文件完整路径与修复指引（改未发布迁移号 /
+  `migrate:prune --apply` 清旧记录 / 以后用 `migrate:create`），替代 Phinx 晦涩异常；
+  migrate:run / migrate:pg / migrate:all / migrate:status 四命令全覆盖。
+
 ## [v2.2.0] - 2026-09-09
 
 ### 新增：migrate:prune —— 清理「已记录但文件缺失」的历史迁移记录
