@@ -106,11 +106,8 @@ class MigrateCreate extends Command
         }
 
         $output->writeln('<info>已创建</info> ' . $file);
-        $output->writeln(sprintf(
-            '<info>版本号</info> %s（%s）| 类 <comment>%s</comment>',
-            $version,
-            $bumped > 0 ? sprintf('当前秒被占用，自动顺延 %d 秒', $bumped) : '当前真实时间'
-        ) . ' | 集合 <comment>' . $dir . '</comment>');
+        $origin = $bumped > 0 ? sprintf('当前秒被占用，自动顺延 %d 秒', $bumped) : '当前真实时间';
+        $output->writeln('<info>版本号</info> ' . $version . '（' . $origin . '）| 类 <comment>' . $class . '</comment> | 集合 <comment>' . $dir . '</comment>');
         $output->writeln('<comment>下一步：补 up()/down() 业务（骨架已按幂等规范生成注释），用 `php webman migrate:run -x` 预检 SQL。</comment>');
         return self::SUCCESS;
     }
