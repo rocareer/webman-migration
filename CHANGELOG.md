@@ -1,5 +1,14 @@
 # Changelog
 
+## [v2.2.0] - 2026-09-09
+
+### 新增：migrate:prune —— 清理「已记录但文件缺失」的历史迁移记录
+
+- 迁移文件改名/下架后记录表残留旧版本行（migrate:status 退出码 2 的 missing 项）；
+  `php webman migrate:prune` 对照 PG 全量集合全部迁移目录列出缺失记录，
+  `--apply` 实际删除（缺省 dry-run）；只动记录表不碰业务表；
+- 退出码对齐 status 语义：0=无缺失/已清理，1=运行错误，2=存在缺失未 --apply。
+
 ## [v2.1.1] - 2026-08-31
 
 ### Install.php 标准化（docs/install-standard.md）

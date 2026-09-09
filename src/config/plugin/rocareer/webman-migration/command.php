@@ -10,4 +10,5 @@ return [
     Rocareer\WebmanMigration\command\MigratePgsql::class,
     Rocareer\WebmanMigration\command\MigrateAll::class,
     Rocareer\WebmanMigration\command\MigrateStatus::class,
+    Rocareer\WebmanMigration\command\MigratePrune::class,
 ];

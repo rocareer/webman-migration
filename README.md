@@ -27,6 +27,7 @@ Webman 迁移基础设施插件：基于 [robmorgan/phinx](https://github.com/ca
 | `php webman migrate:pg` | PG 通道迁移（默认向量集合；`--set=all` 含业务表，终局形态） |
 | `php webman migrate:all` | PG 全量迁移（等价 `migrate:run`，任一失败立即中止，部署首选） |
 | `php webman migrate:status` | 列出 PG 通道已执行/待执行/缺文件迁移（`--channel=pg`，`--json` 机器可读） |
+| `php webman migrate:prune` | 清理「已记录但文件缺失」的历史迁移记录（dry-run 缺省，`--apply` 实删；对照全量集合，只动记录表） |
 
 通用参数（migrate:run / migrate:pg）：
 
