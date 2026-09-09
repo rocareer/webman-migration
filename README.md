@@ -30,9 +30,12 @@ Webman 迁移基础设施插件：基于 [robmorgan/phinx](https://github.com/ca
 | `php webman migrate:status` | 列出 PG 通道已执行/待执行/缺文件迁移（`--channel=pg`，`--json` 机器可读） |
 | `php webman migrate:prune` | 清理「已记录但文件缺失」的历史迁移记录（dry-run 缺省，`--apply` 实删；对照全量集合，只动记录表） |
 
-> **撞号强制预检（v2.3.0）**：migrate:run / pg / all / status 起步即扫本次装载目录，版本号
-> 重复直接中止并输出撞号文件与修复指引——不再让 Phinx 加载阶段抛晦涩的 Duplicate migration。
-> **新迁移一律用 `migrate:create` 生成**，禁止手编「日期 + 整点 000000」时间戳（分秒位浪费且撞车高发）。
+> **迁移文件强检（v2.3.0 撞号 / v2.4.0 命名形态）**：migrate:run / pg / all / status 起步即扫本次装载
+> 目录，以下任一命中直接中止并输出文件与修复指引——版本号撞车（Phinx 晦涩 Duplicate migration）、
+> 数字前缀非 14 位时间戳（含 8 位「年月日就完了」风，Phinx 会照常加载且前缀即版本号）、Phinx 静默
+> 忽略文件（名字段非法/无数字前缀，永远不会被执行）、14 位裸版本号缺名字段、迁移类名重复（PHP fatal）；
+> 「年月日+000000」存量警告放行（新建禁止）。**新迁移一律用 `migrate:create` 生成**：版本号 =
+> 创建那一刻的真实时间（精确到秒，时分秒用满），禁止手编时间戳。
 
 通用参数（migrate:run / migrate:pg）：
 

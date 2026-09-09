@@ -23,6 +23,9 @@ use Symfony\Component\Console\Output\OutputInterface;
  * - 顺带查类名重复（版本号唯一但类名同名照样 PHP fatal）；
  * - 产出幂等迁移骨架（中文注释 + up/down，照工作区迁移编写规范）。
  *
+ * 运行时强检（v2.4.0）：migrate:run/pg/all/status 起步即拦截撞号/非 14 位前缀/静默忽略/
+ * 类名重复，000000 存量警告——本命令生成的文件天然合规，手编文件会被运行时拦下。
+ *
  * 用法：
  *   php webman migrate:create add_foo_table                        # 项目 database/migrations/
  *   php webman migrate:create add_foo_vec --dir=pg-migrations      # 项目 database/pg-migrations/（向量集合）
@@ -74,11 +77,17 @@ class MigrateCreate extends Command
             return self::FAILURE;
         }
 
-        // 签发版本：真实时间起步，撞号 +1 秒顺延（顺延的是生成时间，不改变执行顺序语义）
+        // 签发版本：真实时间起步，撞号 +1 秒顺延（顺延的是生成时间，不改变执行顺序语义）；
+        // HHMMSS=000000（整点零分零秒）直接跳过——与运行时「000000 存量警告」口径一致，
+        // 本命令签发的版本永不落入「年月日就完了」风格
         $base = (int) date('YmdHis');
         $version = null;
         $bumped = 0;
         for ($ts = $base; $ts < $base + 60; $ts++) {
+            if ($ts % 1000000 === 0) {
+                $bumped++;
+                continue;
+            }
             if (!isset($usedVersions[(string) $ts])) {
                 $version = (string) $ts;
                 break;

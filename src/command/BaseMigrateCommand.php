@@ -19,6 +19,8 @@ use Symfony\Component\Console\Output\OutputInterface;
  * - 配置由 PhinxConfig 按 env 生成且确定性，宿主无迁移配置文件、运行期零改写
  * - 自定义 phinx 配置与 phinx 原生子命令（migrate/status/rollback/seed:run 等）
  *   均通过 --config 支持，本包不绕过 phinx 任何能力
+ * - 起步即迁移文件强检（v2.3.0 撞号 / v2.4.0 命名形态）：撞号、非 14 位时间戳前缀、
+ *   Phinx 静默忽略、类名重复直接拦截；「年月日+000000」存量警告放行
  *
  * 子类只声明三件事：通道（channel()）、phinx 子命令名（phinxCommand()）、
  * 允许透传的 phinx 选项（phinxOptions()）。
@@ -66,7 +68,7 @@ abstract class BaseMigrateCommand extends Command
      */
     protected function runChannel(Channel $channel, InputInterface $input, OutputInterface $output, array $forced = []): int
     {
-        if ($this->reportVersionConflicts($channel, $output)) {
+        if ($this->reportMigrationAnomalies($channel, $output)) {
             return self::FAILURE;
         }
 
@@ -130,42 +132,143 @@ abstract class BaseMigrateCommand extends Command
     }
 
     /**
-     * 撞号强制预检：扫描本次通道装载的全部迁移目录，版本号重复直接中止。
+     * 迁移文件强制预检（v2.3.0 撞号 + v2.4.0 命名形态）：扫描本次通道装载的全部迁移目录，
+     * 「阻断全部迁移」或「静默失效」的文件直接中止；「年月日+000000」存量警告放行。
      *
-     * Phinx 加载阶段撞号抛 InvalidArgumentException（Duplicate migration），不带文件
-     * 位置与修复指引，且全部迁移（含无关包）都跑不了；此处提前拦截并给出修复路径。
-     * 返回 true = 存在撞号（调用方应返回 FAILURE）。
+     * 拦截（FAILURE，任一命中即中止）：
+     * - 版本号撞车：Phinx 加载阶段抛 Duplicate migration，不带文件位置且全部迁移跑不了；
+     * - 数字前缀 ≠ 14 位（含 8 位「年月日就完了」风）：Phinx 会照常加载（前缀即版本号），
+     *   同日多文件/跨包撞号高危，且违反「版本号精确到秒」命名铁律；
+     * - Phinx 静默忽略：不匹配 Phinx 文件名正则的 *.php（名字段非法/无数字前缀）永远不会
+     *   被执行——文件躺在目录里造成「已迁移」假象，比报错更危险；
+     * - 14 位裸版本号（缺名字段）：Phinx 会加载但类名推导脆弱；
+     * - 迁移类名重复：版本号唯一但 class 同名照样 PHP fatal。
+     *
+     * 警告（放行）：HHMMSS=000000 的存量迁移——新环境全量待执行，一刀切拦截会让所有项目
+     * 无法初始化；已执行的不受影响，未执行的建议用 migrate:create 重建（up() 幂等，换号
+     * 重跑安全跳过）+ migrate:prune --apply 清旧记录。新建一律 migrate:create，不再产生。
+     *
+     * 返回 true = 存在拦截项（调用方应返回 FAILURE）。
      */
-    private function reportVersionConflicts(Channel $channel, OutputInterface $output): bool
+    private function reportMigrationAnomalies(Channel $channel, OutputInterface $output): bool
     {
         $byVersion = [];
+        $byClass = [];
+        $badPrefix = [];
+        $ignored = [];
+        $bare = [];
+        $midnight = [];
+
         foreach ($channel->migrationPaths() as $path) {
             foreach (glob($path . '/*.php') ?: [] as $file) {
-                if (preg_match('/^(\d{14})_/', basename($file), $m)) {
+                $base = basename($file);
+                if (preg_match('/^(\d+)_/', $base, $m)) {
+                    if (strlen($m[1]) !== 14) {
+                        $badPrefix[] = $file;
+                        continue;
+                    }
+                    if (!preg_match('/^\d{14}_[a-z][a-z\d]*(?:_[a-z\d]+)*\.php$/i', $base)) {
+                        $ignored[] = $file;
+                        continue;
+                    }
                     $byVersion[$m[1]][] = $file;
+                    if (substr($m[1], 8) === '000000') {
+                        $midnight[] = $file;
+                    }
+                } elseif (preg_match('/^\d{14}\.php$/', $base)) {
+                    $bare[] = $file;
+                } else {
+                    $ignored[] = $file;
+                    continue;
+                }
+                // 类名查重只看 Phinx 会加载的文件（非法命名的类永远不会被装载，不构成 fatal）
+                if (preg_match('/^\s*class\s+(\w+)/m', (string) file_get_contents($file), $c)) {
+                    $byClass[$c[1]][] = $file;
                 }
             }
         }
+
         $conflicts = array_filter($byVersion, static fn(array $files): bool => count($files) > 1);
-        if ($conflicts === []) {
-            return false;
+        $classConflicts = array_filter($byClass, static fn(array $files): bool => count($files) > 1);
+        $sections = [];
+        if ($conflicts !== []) {
+            $lines = ['版本号撞车（Phinx 加载即抛 Duplicate migration，全部迁移跑不了）：'];
+            foreach ($conflicts as $version => $files) {
+                $lines[] = "  版本 {$version} 同时存在：";
+                foreach ($files as $file) {
+                    $lines[] = '    - ' . $file;
+                }
+            }
+            $sections[] = $lines;
+        }
+        if ($badPrefix !== []) {
+            $lines = ['数字前缀非 14 位时间戳（Phinx 会照常加载且前缀即版本号——8 位「年月日就完了」风撞号高危，违反精确到秒）：'];
+            foreach ($badPrefix as $file) {
+                $lines[] = '    - ' . $file;
+            }
+            $sections[] = $lines;
+        }
+        if ($ignored !== []) {
+            $lines = ['Phinx 静默忽略（不匹配迁移文件名正则，永远不会被执行，只是看起来像已迁移）：'];
+            foreach ($ignored as $file) {
+                $lines[] = '    - ' . $file;
+            }
+            $sections[] = $lines;
+        }
+        if ($bare !== []) {
+            $lines = ['14 位裸版本号缺名字段（Phinx 会加载但类名推导脆弱）：'];
+            foreach ($bare as $file) {
+                $lines[] = '    - ' . $file;
+            }
+            $sections[] = $lines;
+        }
+        if ($classConflicts !== []) {
+            $lines = ['迁移类名重复（版本号唯一但 class 同名照样 PHP fatal）：'];
+            foreach ($classConflicts as $class => $files) {
+                $lines[] = "  类 {$class} 同时存在：";
+                foreach ($files as $file) {
+                    $lines[] = '    - ' . $file;
+                }
+            }
+            $sections[] = $lines;
         }
 
-        $output->writeln(sprintf(
-            '<error>[%s 通道] 迁移版本号撞车，已强制中止（Phinx 加载阶段撞号会让全部迁移跑不了）：</error>',
-            $channel->label()
-        ));
-        foreach ($conflicts as $version => $files) {
-            $output->writeln("<error>  版本 {$version} 同时存在：</error>");
-            foreach ($files as $file) {
-                $output->writeln('<error>    - ' . $file . '</error>');
+        if ($sections !== []) {
+            $total = count($conflicts, COUNT_RECURSIVE) - count($conflicts)
+                + count($badPrefix) + count($ignored) + count($bare)
+                + count($classConflicts, COUNT_RECURSIVE) - count($classConflicts);
+            $output->writeln(sprintf(
+                '<error>[%s 通道] 迁移文件预检未通过（%d 个文件异常），已强制中止：</error>',
+                $channel->label(),
+                $total
+            ));
+            foreach ($sections as $lines) {
+                $output->writeln('<error>  ' . array_shift($lines) . '</error>');
+                foreach ($lines as $line) {
+                    $output->writeln('<error>' . $line . '</error>');
+                }
             }
+            $output->writeln(
+                "<comment>  修复：新迁移一律 `php webman migrate:create` 生成（真实时间戳精确到秒 + 全局查重自动顺延）；\n" .
+                "  未发布/未执行的迁移改号或重建（up() 幂等，换号重跑安全跳过），已执行迁移改号无效、旧记录用 `migrate:prune --apply` 清理；\n" .
+                '  名字段非法/无数字前缀的文件改名或移出迁移目录。</comment>'
+            );
         }
-        $output->writeln(
-            "<comment>  修复：未发布/未执行的迁移改版本号（已执行迁移改名无效，用 migrate:prune --apply 清旧记录）；\n" .
-            '  新迁移一律用 `php webman migrate:create` 生成（真实时间戳 + 全局查重自动顺延）。</comment>'
-        );
-        return true;
+
+        if ($midnight !== []) {
+            $shown = array_slice($midnight, 0, 5);
+            $more = count($midnight) - count($shown);
+            $output->writeln(sprintf(
+                '<comment>[%s 通道] 「年月日+000000」风格存量迁移 %d 个（警告不拦截；新建禁止此风格）：%s%s；'
+                . '已执行的不受影响，未执行的建议 migrate:create 重建 + migrate:prune --apply 清旧记录</comment>',
+                $channel->label(),
+                count($midnight),
+                implode('、', array_map('basename', $shown)),
+                $more > 0 ? " 等（另有 {$more} 个）" : ''
+            ));
+        }
+
+        return $sections !== [];
     }
 
     /**
