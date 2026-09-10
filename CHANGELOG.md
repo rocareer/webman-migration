@@ -75,7 +75,7 @@ v2.4.1 起两命令 `--set` 缺省一律对齐 `migrate:run`（`all` 全量集�
   copy_dir(..., true) 保留（接线配置以包内为准刷新，注释已声明）。
 - rocareer:audit install_standard 规则全绿。
 
-## [v2.1.0] - 2026-12-06
+## [v2.1.0] - 2026-08-29
 
 ### PG-only 通道收口：移除 MySQL 通道（方案 A 已全 PG，MySQL 退役）
 - 删除 Channel::mysql()/MYSQL 常量与 MYSQL_* 连接分支；连接/前缀仅 PG（PG_PREFIX 缺省 ra_）
@@ -83,7 +83,7 @@ v2.4.1 起两命令 `--set` 缺省一律对齐 `migrate:run`（`all` 全量集�
 - migrate:all = PG 全量（fail-fast）；migrate:status --channel 仅接受 pg
 
 
-## [v2.0.0] - 2026-12-06
+## [v2.0.0] - 2026-08-29
 
 ### 重构：配置即代码 + 通道化引擎 + 退出码真实化（方案 A：专为 webman PG 而生）
 
@@ -117,7 +117,7 @@ v2.4.1 起两命令 `--set` 缺省一律对齐 `migrate:run`（`all` 全量集�
 - **兼容性**：命令名不变（migrate:run / migrate:pg 语义不变），迁移记录表 `<前缀>migrations`
   不变——升级不重跑已执行迁移；radmin 依赖约束放宽为 `^1.0.3 || ^2.0`。
 
-## [v1.1.0] - 2026-12-06
+## [v1.1.0] - 2026-08-29
 
 ### PostgreSQL 迁移通道（feat，配合 rocareer/memory|knowledge v3 全 PG 向量体系）
 
