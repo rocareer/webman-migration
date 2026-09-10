@@ -1,5 +1,20 @@
 # Changelog
 
+## [v2.4.1] - 2026-09-10
+
+### 修复：status/all 缺省集合对齐 migrate:run 全量口径
+
+`migrate:status` / `migrate:all` 的 `--set` 缺省原跟随 `PG_MIGRATION_SETS` 环境键
+（缺省 `vector`），与 `migrate:run` 的全量口径不一致，产生两个假象：
+
+- **status 只扫 vector 集误报业务集 MISSING**：业务集的 phinxlog 历史行被报
+  「已记录但文件缺失」（退出码 2 假红），部署脚本按退出码判活即误报；
+- **migrate:all「部署首选」缺省欠扫**：缺省只跑向量集，与自身文档「全量」表述矛盾，
+  业务集迁移被静默跳过。
+
+v2.4.1 起两命令 `--set` 缺省一律对齐 `migrate:run`（`all` 全量集），显式传
+`--set=vector|business` 不受影响。
+
 ## [v2.4.0] - 2026-09-09
 
 ### 新增：运行前迁移文件强检扩展——命名精确到秒，非法文件拦截不放行（v2.3.0 只查撞号）
