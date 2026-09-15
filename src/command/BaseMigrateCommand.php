@@ -19,8 +19,8 @@ use Symfony\Component\Console\Output\OutputInterface;
  * - 配置由 PhinxConfig 按 env 生成且确定性，宿主无迁移配置文件、运行期零改写
  * - 自定义 phinx 配置与 phinx 原生子命令（migrate/status/rollback/seed:run 等）
  *   均通过 --config 支持，本包不绕过 phinx 任何能力
- * - 起步即迁移文件强检（v2.3.0 撞号 / v2.4.0 命名形态）：撞号、非 14 位时间戳前缀、
- *   Phinx 静默忽略、类名重复直接拦截；「年月日+000000」存量警告放行
+ * - 起步即迁移文件强检（v2.3.0 撞号 / v2.4.0 命名形态 / v2.5.0 未来日期）：撞号、非 14 位
+ *   时间戳前缀、占位未来日期、Phinx 静默忽略、类名重复直接拦截；「年月日+000000」存量警告放行
  *
  * 子类只声明三件事：通道（channel()）、phinx 子命令名（phinxCommand()）、
  * 允许透传的 phinx 选项（phinxOptions()）。
@@ -132,13 +132,16 @@ abstract class BaseMigrateCommand extends Command
     }
 
     /**
-     * 迁移文件强制预检（v2.3.0 撞号 + v2.4.0 命名形态）：扫描本次通道装载的全部迁移目录，
-     * 「阻断全部迁移」或「静默失效」的文件直接中止；「年月日+000000」存量警告放行。
+     * 迁移文件强制预检（v2.3.0 撞号 + v2.4.0 命名形态 + v2.5.0 未来日期）：扫描本次通道装载的
+     * 全部迁移目录，「阻断全部迁移」或「静默失效」的文件直接中止；「年月日+000000」存量警告放行。
      *
      * 拦截（FAILURE，任一命中即中止）：
      * - 版本号撞车：Phinx 加载阶段抛 Duplicate migration，不带文件位置且全部迁移跑不了；
      * - 数字前缀 ≠ 14 位（含 8 位「年月日就完了」风）：Phinx 会照常加载（前缀即版本号），
      *   同日多文件/跨包撞号高危，且违反「版本号精确到秒」命名铁律；
+     * - 版本号晚于当前时间（占位未来日期）：Phinx 按版本升序执行，未来版本会排到全部真实日期
+     *   迁移之后——全新空库上真实日期的业务种子先跑而依赖的表后建，直接断链（2026-09-16
+     *   全工作区 65 文件实案根治，TASK-20260916-544）；留 5 分钟时钟偏移余量；
      * - Phinx 静默忽略：不匹配 Phinx 文件名正则的 *.php（名字段非法/无数字前缀）永远不会
      *   被执行——文件躺在目录里造成「已迁移」假象，比报错更危险；
      * - 14 位裸版本号（缺名字段）：Phinx 会加载但类名推导脆弱；
@@ -158,6 +161,8 @@ abstract class BaseMigrateCommand extends Command
         $ignored = [];
         $bare = [];
         $midnight = [];
+        $future = [];
+        $futureCutoff = date('YmdHis', time() + 300);
 
         foreach ($channel->migrationPaths() as $path) {
             foreach (glob($path . '/*.php') ?: [] as $file) {
@@ -174,6 +179,9 @@ abstract class BaseMigrateCommand extends Command
                     $byVersion[$m[1]][] = $file;
                     if (substr($m[1], 8) === '000000') {
                         $midnight[] = $file;
+                    }
+                    if ($m[1] > $futureCutoff) {
+                        $future[] = $file;
                     }
                 } elseif (preg_match('/^\d{14}\.php$/', $base)) {
                     $bare[] = $file;
@@ -215,6 +223,13 @@ abstract class BaseMigrateCommand extends Command
             }
             $sections[] = $lines;
         }
+        if ($future !== []) {
+            $lines = ['版本号晚于当前时间（占位未来日期——Phinx 按版本升序执行，未来版本排到最后，全新空库上真实日期业务种子先跑而依赖表后建直接断链；违反 migrate:create 真实时间戳铁律）：'];
+            foreach ($future as $file) {
+                $lines[] = '    - ' . $file;
+            }
+            $sections[] = $lines;
+        }
         if ($bare !== []) {
             $lines = ['14 位裸版本号缺名字段（Phinx 会加载但类名推导脆弱）：'];
             foreach ($bare as $file) {
@@ -235,7 +250,7 @@ abstract class BaseMigrateCommand extends Command
 
         if ($sections !== []) {
             $total = count($conflicts, COUNT_RECURSIVE) - count($conflicts)
-                + count($badPrefix) + count($ignored) + count($bare)
+                + count($badPrefix) + count($ignored) + count($future) + count($bare)
                 + count($classConflicts, COUNT_RECURSIVE) - count($classConflicts);
             $output->writeln(sprintf(
                 '<error>[%s 通道] 迁移文件预检未通过（%d 个文件异常），已强制中止：</error>',
