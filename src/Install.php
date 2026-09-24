@@ -31,7 +31,7 @@ class Install
      */
     public static function install($isFirst = true): void
     {
-        static::installByRelation();
+        static::installByRelation($isFirst);
         static::retireLegacyConfigs();
     }
 
@@ -41,7 +41,7 @@ class Install
      */
     public static function update(): void
     {
-        static::installByRelation();
+        static::installByRelation(false);
         static::retireLegacyConfigs();
     }
 
@@ -72,29 +72,96 @@ class Install
     }
 
     /**
-     * 拷贝接线配置到宿主项目（overwrite=true：插件配置以包内为准，升级刷新命令注册等，
-     * 防止 webman copy_dir 默认「存在即跳过」留下宿主旧版配置漂移）
-     * @return void
+     * 拷贝接线配置到宿主项目。
+     *
+     * 落盘口径（install-standard §三）：**目标目录已存在即只补缺失文件，不看 `$isFirst`**。
+     * 旧实现是官方模板的目录拷贝（overwrite=true，标准 §三/§五 明令禁止的语法），且
+     * 「插件配置以包内为准」的覆盖语义会静默抹掉宿主定制——与 2026-09-24 全仓守卫改造同批纠正。
+     *
+     * @param bool $isFirst 首次安装标记（保留以对齐标准签名；落盘不看它，见上）
      */
-    public static function installByRelation(): void
+    public static function installByRelation(bool $isFirst = true): void
     {
         foreach (static::$pathRelation as $source => $dest) {
+            $sourcePath = __DIR__ . "/$source";
+            $destPath = base_path() . "/$dest";
+            if (!is_dir($sourcePath)) {
+                continue;   // 包内无该接线目录：本关系为空操作（不打印、不建目录）
+            }
             if ($pos = strrpos($dest, '/')) {
-                $parent_dir = base_path() . '/' . substr($dest, 0, $pos);
-                if (!is_dir($parent_dir)) {
-                    mkdir($parent_dir, 0777, true);
+                $parentDir = base_path() . '/' . substr($dest, 0, $pos);
+                if (!is_dir($parentDir)) {
+                    mkdir($parentDir, 0777, true);
                 }
             }
-            copy_dir(__DIR__ . "/$source", base_path() . "/$dest", true);
-            echo "Create $dest\n";
+            if (!is_dir($destPath)) {
+                static::copyDir($sourcePath, $destPath);
+                echo "Create $dest\n";
+            } else {
+                $copied = static::copyMissingFiles($sourcePath, $destPath);
+                if ($copied > 0) {
+                    echo "Create $dest ({$copied} new file(s))\n";
+                }
+            }
         }
         static::syncManifest();
     }
 
-    /**
-     * 移除拷贝到宿主项目的接线配置
-     * @return void
-     */
+    /** 递归拷贝整目录（仅首次安装、目标不存在时用） */
+    protected static function copyDir(string $source, string $dest): void
+    {
+        if (!is_dir($source)) {
+            return;
+        }
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($source, \RecursiveDirectoryIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::SELF_FIRST
+        );
+        foreach ($iterator as $item) {
+            $targetPath = $dest . '/' . $iterator->getSubPathName();
+            if ($item->isDir()) {
+                if (!is_dir($targetPath)) {
+                    mkdir($targetPath, 0755, true);
+                }
+                continue;
+            }
+            if (!is_dir(dirname($targetPath))) {
+                mkdir(dirname($targetPath), 0755, true);
+            }
+            copy($item->getPathname(), $targetPath);
+        }
+    }
+
+    /** 补齐源目录中存在而目标缺失的文件（升级路径；返回补拷数量）。缺失才写，已存在一律不覆盖（宿主定制优先）。 */
+    protected static function copyMissingFiles(string $source, string $dest): int
+    {
+        $copied = 0;
+        if (!is_dir($source)) {
+            return $copied;
+        }
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($source, \RecursiveDirectoryIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::SELF_FIRST
+        );
+        foreach ($iterator as $item) {
+            $target = $dest . '/' . $iterator->getSubPathName();
+            if ($item->isDir()) {
+                if (!is_dir($target)) {
+                    mkdir($target, 0755, true);
+                }
+                continue;
+            }
+            if (!is_file($target)) {
+                if (!is_dir(dirname($target))) {
+                    mkdir(dirname($target), 0755, true);
+                }
+                copy($item->getPathname(), $target);
+                $copied++;
+            }
+        }
+        return $copied;
+    }
+
     /**
      * 卸载接线关系：**逐文件**按安装清单判定，绝不整目录删（守卫口径见 syncManifest 上方注释）。
      */
@@ -116,25 +183,6 @@ class Install
             }
         }
         static::saveManifest($manifest);
-    }
-
-    /**
-     * 递归删除目录
-     * @return void
-     */
-    protected static function removeDir(string $dir): void
-    {
-        if (!is_dir($dir)) {
-            return;
-        }
-        foreach (scandir($dir) ?: [] as $item) {
-            if ($item === '.' || $item === '..') {
-                continue;
-            }
-            $path = $dir . '/' . $item;
-            is_dir($path) ? static::removeDir($path) : unlink($path);
-        }
-        rmdir($dir);
     }
 
     // ==================== 接线配置卸载守卫（2026-09-24 立；与 rocareer/queue v1.8.7 同源实现）====================
@@ -160,7 +208,10 @@ class Install
                     unset($manifest[$rel]);
                 }
             }
-            $sourcePath = dirname(__DIR__) . '/' . $source;
+            // 注意：本包的接线配置随源码落 `src/config/...`（与其它包「配置在包根」不同），
+            // 故基准是 __DIR__（Install.php 所在目录）——必须与 installByRelation 的取源基准一致，
+            // 否则清单会写空（2026-09-24 实测：用 dirname(__DIR__) 时清单 0 条，卸载退化成"全部保留"）。
+            $sourcePath = __DIR__ . '/' . $source;
             $destPath = base_path() . '/' . $dest;
             if (is_dir($sourcePath) && is_dir($destPath)) {
                 foreach (static::filesUnder($sourcePath) as $rel) {
