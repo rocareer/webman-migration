@@ -1,5 +1,25 @@
 # Changelog
 
+## [v2.6.0] - 2026-09-25
+
+### 新增
+
+- **迁移连接带 `lock_timeout`（缺省 10s）**：DDL 等锁超时**快速失败**，而不是无限排队。经 libpq 的
+  `PGOPTIONS` 注入（PDO_PGSQL 走 libpq，尊重该变量），**不碰连接构造、不改 `search_path`**，跑完恢复原值
+  （同进程后续操作不受影响）。覆盖：环境变量 `PG_MIGRATE_LOCK_TIMEOUT`（如 `30s`）；设 `0` 关闭本保护。
+
+**为什么必须有**（2026-09-25 Rolling 实测事故）：**PG 锁队列是 FIFO** —— 一条 `ALTER TABLE` 一旦排队等锁，
+其后**所有**请求该表的语句（即使与持有者锁相容）也一起排队。一条孤儿 `SELECT COUNT(*)` 持
+`ra_super_memory_material` 的 ACCESS SHARE 锁跑了 2 小时 ⇒ 新迁移的 `ALTER TABLE … ADD COLUMN` 等锁 825s
+⇒ 35 个进程 `[busy]`（4 个 HTTP worker 全卡死、后台 8787 无响应、llm 与 batch 两组消费者停摆、crontab 停摆），
+长语句峰值 101 条。加本保护后，DDL 最多等 10s 即失败重试，不会把全站按锁队列一起拖住。
+
+**实现注意（自测抓到的坑）**：判环境变量「未设置」必须用 `getenv() === false` —— PHP 里 `'0'` 是假值，
+写成 `?: '10s'` 会让「关闭」开关**静默失效**（首版即踩：反证时读到 10s 才发现）。
+
+**验证（Rolling 实测，活体读数）**：迁移体内 `SHOW lock_timeout` 打印——缺省读到 `10s`、
+`PG_MIGRATE_LOCK_TIMEOUT=0` 读到 `0`（反证），两向都成立。
+
 ## [v2.5.2] - 2026-09-24
 
 ### 修复

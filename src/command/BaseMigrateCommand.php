@@ -116,6 +116,22 @@ abstract class BaseMigrateCommand extends Command
             $phinxInput['--' . $option] = $value;
         }
 
+        // 迁移连接带 lock_timeout（v2.6.0）：DDL 等锁超时**快速失败**，而不是无限排队。
+        // PG 锁队列是 FIFO —— 一条 `ALTER TABLE` 一旦排队等锁，其后**所有**请求该表的语句
+        // （即使与持有者锁相容）也一起排队。2026-09-25 实测：一条孤儿 COUNT 持表锁 2h ⇒ ALTER 等 825s
+        // ⇒ 35 个进程 busy、后台 8787 无响应、队列停摆（全站 PG 访问级联堵死）。
+        // 经 libpq 的 PGOPTIONS 注入（PDO_PGSQL 走 libpq，尊重该变量）：不碰连接构造、不改 search_path。
+        // 覆盖：环境变量 PG_MIGRATE_LOCK_TIMEOUT（如 '30s'）；设 '0' 关闭本保护。
+        // 注意用 `=== false` 判未设置——PHP 里 '0' 是假值，写成 `?: '10s'` 会让「关闭」开关静默失效。
+        $lockRaw = getenv('PG_MIGRATE_LOCK_TIMEOUT');
+        $lockTimeout = trim((string) ($lockRaw === false ? '10s' : $lockRaw));
+        $pgOptionsPrev = getenv('PGOPTIONS');
+        $pgOptionsSet = $lockTimeout !== '' && $lockTimeout !== '0';
+        if ($pgOptionsSet) {
+            $base = $pgOptionsPrev === false ? '' : trim((string) $pgOptionsPrev);
+            putenv('PGOPTIONS=' . trim($base . ' -c lock_timeout=' . $lockTimeout));
+        }
+
         $phinx = new PhinxApplication();
         $phinx->setAutoExit(false);
         try {
@@ -123,6 +139,11 @@ abstract class BaseMigrateCommand extends Command
         } catch (\Throwable $e) {
             $output->writeln(sprintf('<error>[%s 通道] 运行失败：%s</error>', $channel->label(), $e->getMessage()));
             return self::FAILURE;
+        } finally {
+            if ($pgOptionsSet) {
+                // 恢复原值：同进程后续操作不受本保护影响（putenv 不带 '=' 即删除该变量）
+                $pgOptionsPrev === false ? putenv('PGOPTIONS') : putenv('PGOPTIONS=' . $pgOptionsPrev);
+            }
         }
         $output->writeln(sprintf('<info>[%s 通道] 结束，退出码 %d</info>', $channel->label(), $code));
 
